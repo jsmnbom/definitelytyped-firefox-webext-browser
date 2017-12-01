@@ -236,51 +236,77 @@ class Converter {
                 out += '_' + this.convertEnumName(type.id);
             }
         } else if (type.type) {
+            // The type has an actual type, check it
             if (type.type === 'object') {
+                // It's an object, how is the object constructed?
                 if (type.functions || type.events) {
+                    // It has functions or events, treat it as a claas
                     out += this.convertClass(type);
                 } else if (type.properties || type.patternProperties) {
+                    // It has properties, convert those
                     let properties = this.convertObjectProperties(type);
+                    // If it has no properties, just say it's some type of object
                     if (properties.length > 0) {
                         out += `{\n${properties.join(';\n')};\n}`;
                     } else {
                         out += 'object';
                     }
                 } else if (type.isInstanceOf) {
+                    // It's an instance of another type
                     if (type.additionalProperties && type.additionalProperties.type === 'any') {
+                        // The schemas write set additionalProperties.type = 'any' when typechecking can be anything
+                        // This probably means it's some kind of DOM element like 'window', we assume it's just some sort of object
                         out += `object/*${type.isInstanceOf}*/`;
                     } else {
+                        // If the schema does not do that, try converting as a reference
                         out += this.convertRef(type.isInstanceOf);
                     }
                 } else if (type.additionalProperties) {
+                    // If it has additional, but not normal properties, try converting those properties as a type, passing the parent name
+                    type.additionalProperties.id = type.id;
                     out += this.convertType(type.additionalProperties);
                 } else {
+                    // Okay so it's just some kind of object, right?...
                     out += 'object';
                 }
             } else if (type.type === 'array') {
+                // It's an array
+                // Does it specify a fixed amount of items?
                 if (type.minItems && type.maxItems && type.minItems === type.maxItems) {
-                    out += `[${new Array(type.minItems).fill(this.convertPrimitive(type.items.type)).join(', ')}]`
+                    // Yes, fixed amount of items, output it as an array literal
+                    out += `[${new Array(type.minItems).fill(this.convertType(type.items)).join(', ')}]`
                 } else if (type.items) {
+                    // Figure out the array type, passing parent name
                     type.items.id = type.id;
                     let arrayType = this.convertType(type.items);
-                    if (arrayType.includes('\n') || arrayType.includes(';') || arrayType.includes(',')) { // Is it a simple type? TODO: Do this better
+                    // Very bad check to see if it's a "simple" type in array terms
+                    // This just checks if it's an enum or object, really
+                    // TODO: Could probably be done better
+                    if (arrayType.includes('\n') || arrayType.includes(';') || arrayType.includes(',')) {
+                        // If it's not simple, use the Array<type> syntax
                         out += `Array<${arrayType}>`;
                     } else {
+                        // If it is simple use type[] syntax
                         out += `${arrayType}[]`;
                     }
                 }
             } else if (type.type === 'function') {
-                if (type.name === 'callback') return;
+                // It's a function
+                // Convert it as an array function
                 out += this.convertFunction(type, true, false);
             } else if (SIMPLE_TYPES.includes(type.type)) {
+                // It's a simple primitive
                 out += this.convertPrimitive(type.type);
             }
         } else if (type['$ref']) {
+            // If it's a refrence
             out += this.convertRef(type['$ref']);
         } else if (type.value) {
+            // If it has a fixed value, just set its type as the type of said value
             out += typeof type.value;
         }
         if (out === '') {
+            // Output an error if the type couldn't be converted using logic above
             throw new Error(`Cannot handle type ${JSON.stringify(type)}`);
         }
         return out;
@@ -288,16 +314,22 @@ class Converter {
 
     collapseExtendedTypes(types) {
         let collapsedTypes = {};
+        // For each type
         for (let type of types) {
+            // Get its id or the id of the type it extends
             let name = type['$extend'] || type.id;
+            // Don't want this key to be merged (as it could cause conflicts if that is even possible)
+            delete type['$extend'];
+            // Have we seen it before?
             if (collapsedTypes.hasOwnProperty(name)) {
+                // Merge with the type we already have, concatting any arrays
                 _.mergeWith(collapsedTypes[name], type, (objValue, srcValue) => {
                     if (_.isArray(objValue)) {
                         return objValue.concat(srcValue);
                     }
                 });
             } else {
-                delete type['$extend'];
+                // Okay first time we see it, so for now it's collapsed
                 collapsedTypes[name] = type;
             }
         }
@@ -306,20 +338,29 @@ class Converter {
 
     convertTypes(types) {
         if (types === undefined) return [];
+        // Collapse types that have an $extend in them
         types = this.collapseExtendedTypes(types);
         let convertedTypes = [];
+        // For each type
         for (let type of types) {
-            if (type === undefined) console.log(type);
+            // Convert it as a root type
             let convertedType = this.convertType(type, true);
+            // If we get nothing in return, ignore it
             if (convertedType === undefined) continue;
+            // If we get its id in return, it's being weird and should just not be typechecked
             if (convertedType === type.id) convertedType = 'any';
+            // Add converted source with proper keyword in front
+            // This is here instead of in convertType, since that is also used for non root purposes
             if (type.functions || type.events) {
+                // If it has functions or events it's a class
                 convertedTypes.push(`class ${type.id} ${convertedType}`);
             } else if (type.enum) {
                 convertedTypes.push(`enum ${this.convertEnumName(type.id)} ${convertedType}`);
             } else if (type.type === 'object' && !type.isInstanceOf) {
+                // It's an object, that's not an instance of another one
                 convertedTypes.push(`interface ${type.id} ${convertedType}`);
             } else {
+                // It's just a type of some kind
                 convertedTypes.push(`type ${type.id} = ${convertedType};`);
             }
         }
@@ -329,6 +370,7 @@ class Converter {
     convertProperties(properties) {
         if (properties === undefined) return [];
         let convertedProperties = [];
+        // For each property, just add it as a const, appending | undefined if it's optional
         for (let prop of Object.keys(properties)) {
             convertedProperties.push(`const ${prop}: ${this.convertType(properties[prop])}${properties[prop].optional ? ' | undefined' : ''};`);
         }
@@ -338,10 +380,14 @@ class Converter {
     convertParameters(parameters, includeName = true, name = undefined) {
         if (parameters === undefined) return [];
         let convertedParameters = [];
+        // For each parameter
         for (let parameter of Object.keys(parameters)) {
+            // If it's a function and that function is 'callback' we skip it since we don't use callbacks but promises instead
             if (parameters[parameter].type && parameters[parameter].name && parameters[parameter].type === 'function' && parameters[parameter].name === 'callback') continue;
             let out = '';
+            // If includeName then include the name (add ? if optional)
             if (includeName) out += `${parameters[parameter].name ? parameters[parameter].name : parameter}${parameters[parameter].optional ? '?' : ''}: `;
+            // Convert the paremeter type passing parent id as id
             parameters[parameter].id = name;
             out += this.convertType(parameters[parameter]);
             convertedParameters.push(out);
@@ -350,11 +396,14 @@ class Converter {
     }
 
     convertSingleFunction(name, parameters, returnType, arrow, classy) {
+        // function x() {} or () => {}?
         if (arrow) {
-            return `${classy ? '' : ''}${classy ? `${name}` : ''}(${parameters.join(', ')})${classy ? ':' : ' =>'} ${returnType}`;
+            // Okay () => {}, unless we want it classy (inside a class) in which case use name(): {}
+            return `${classy ? `${name}` : ''}(${parameters.join(', ')})${classy ? ':' : ' =>'} ${returnType}`;
         } else {
+            // If the name is a reversed keyword
             if (RESERVED.includes(name)) {
-                //return `const ${name} = function (${parameters.join(', ')}): ${returnType};`;
+                // Add an underscore to the definition and export it as the proper name
                 this.additionalTypes.push(`export {_${name} as ${name}};`);
                 name = '_' + name;
             }
@@ -364,18 +413,36 @@ class Converter {
 
     convertFunction(func, arrow = false, classy = false) {
         let out = '';
+        // Assume it returns void until proven otherwise
         let returnType = 'void';
+        // Prove otherwise? either a normal returns or as an async promise
         if (func.returns) {
             returnType = this.convertType(func.returns);
         } else if (func.async === 'callback') {
+            // If it's async then find the callback function and convert it to a promise
             let parameters = this.convertParameters(func.parameters.find(x => x.type === 'function' && x.name === 'callback').parameters, false, func.name);
             if (parameters.length > 1) {
+                // Since these files are originally chrome, some things are a bit weird
+                // Callbacks (which is what chrome uses) have no issues with returning multiple values
+                // but firefox uses promises, which AFAIK can't handle that
+                // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in question yet
+                // But since it's in the schemas, it's still a problem for us
+                // TODO: Follow firefox developements in this area
                 console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
+                // Just assume it's gonna be some kind of object that's returned from the promise
+                // This seems like the most likely way the firefox team is going to make the promise return multiple values
                 parameters = ['object']
             }
+            // Use void as return type if there were no parameters
+            // Note that the join is kinda useless (see long comments above)
             returnType = `Promise<${parameters.join(', ') || 'void'}>`
         }
+
+        // Get parameters
         let parameters = this.convertParameters(func.parameters, true, func.name);
+        // Typescript can't handle when e.g. parameter 1 is optional, but parameter 2 isn't
+        // Therefore output multiple function choices where we one by one, strip the optional status
+        // So we get an function that's '(one, two) | (two)' instead of '(one?, two)'
         for (let i = 0; i < parameters.length; i++) {
             if (parameters[i].includes('?') && parameters.length > i + 1) {
                 out += this.convertSingleFunction(func.name, parameters.slice(i + 1), returnType, arrow, classy) + (classy ? ';\n' : '\n');
@@ -406,17 +473,24 @@ class Converter {
 
     // noinspection JSMethodCanBeStatic
     convertSingleEvent(parameters, returnType) {
+        // Use the helper that we define in HEADER
         return `EventListener<(${parameters.join(', ')}) => ${returnType}>`;
     }
 
     convertEvent(event, classy = false) {
         let out = '';
+        // Assume it returns void until proven otherwise
         let returnType = 'void';
+        // Prove otherwise?
         if (event.returns) {
             returnType = this.convertType(event.returns);
         }
 
+        // Get parameters
         let parameters = this.convertParameters(event.parameters, true);
+        // Typescript can't handle when e.g. parameter 1 is optional, but parameter 2 isn't
+        // Therefore output multiple event choices where we one by one, strip the optional status
+        // So we get an event that's '(one, two) | (two)' instead of '(one?, two)'
         for (let i = 0; i < parameters.length; i++) {
             if (parameters[i].includes('?') && parameters.length > i + 1) {
                 out += '\n| ' + this.convertSingleEvent(parameters.slice(i + 1), returnType, classy);
@@ -431,6 +505,7 @@ class Converter {
             return x;
         });
 
+        // Add const and ; if we're not in a class
         out = `${!classy ? 'const ' : ''}${event.name}: ${this.convertSingleEvent(parameters, returnType, classy)}${out}${!classy ? ';' : ''}`;
 
         return out;
