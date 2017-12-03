@@ -51,6 +51,8 @@ converter.edit('runtime', 'functions', 'getManifest', x => {
     x.returns = {'$ref': 'manifest.WebExtensionManifest'};
     return x;
 });
+// Remove NativeManifest since it's not an exposed api
+converter.remove('manifest', 'types', 'NativeManifest');
 
 converter.convert();
 converter.write(argv['o']);
