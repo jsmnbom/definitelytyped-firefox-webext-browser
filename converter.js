@@ -219,8 +219,13 @@ class Converter {
                     // It's an instance of another type
                     if (type.additionalProperties && type.additionalProperties.type === 'any') {
                         // The schemas write set additionalProperties.type = 'any' when typechecking can be anything
-                        // This probably means it's some kind of DOM element like 'window', we assume it's just some sort of object
-                        out += `object/*${type.isInstanceOf}*/`;
+                        // This usually means it's "window" included as part of DOM
+                        if (type.isInstanceOf.toLowerCase() === 'window') {
+                            out += type.isInstanceOf;
+                        } else {
+                            // Otherwise it's some object we don't know about, therefore just treat it as a random object
+                            out += `object/*${type.isInstanceOf}*/`;
+                        }
                     } else {
                         // If the schema does not do that, try converting as a reference
                         out += this.convertRef(type.isInstanceOf);
