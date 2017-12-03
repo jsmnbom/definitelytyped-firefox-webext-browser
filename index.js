@@ -41,9 +41,16 @@ interface Window {
 
 let converter = new Converter(argv['s'], HEADER, NAMESPACE_ALIASES);
 
-// Customizations
-delete converter.namespaces.test;
-_.remove(converter.namespaces.manifest.types, x => x.id === 'WebExtensionLangpackManifest');
+/* Customizations */
+// Remove test namespace since it's not exposed in api
+converter.removeNamespace('test');
+// Remove manifest.WebExtensionLangpackManifest as it's not exposed api
+converter.remove('manifest', 'types', 'WebExtensionLangpackManifest');
+// browser.runtime.getManifest should return WebExtensionManifest
+converter.edit('runtime', 'functions', 'getManifest', x => {
+    x.returns = {'$ref': 'manifest.WebExtensionManifest'};
+    return x;
+});
 
 converter.convert();
 converter.write(argv['o']);

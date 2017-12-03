@@ -519,6 +519,28 @@ class Converter {
             fs.writeFileSync(filename, this.out.slice(0, this.out.length - 1));
         }.bind(this));
     }
+
+    removeNamespace(name) {
+        delete this.namespaces[name];
+    }
+
+    getIndex(namespace, section, id_or_name) {
+        return this.namespaces[namespace][section].findIndex(x => {
+            return x['id'] === id_or_name
+                || x['name'] === id_or_name
+                || x['$extends'] === id_or_name
+                || x['$import'] === id_or_name;
+        });
+    }
+
+    remove(namespace, section, id_or_name) {
+        this.namespaces[namespace][section].splice(this.getIndex(namespace, section, id_or_name), 1);
+    }
+
+    edit(namespace, section, id_or_name, edit) {
+        let index = this.getIndex(namespace, section, id_or_name);
+        this.namespaces[namespace][section][index] = edit(this.namespaces[namespace][section][index]);
+    }
 }
 
 exports.Converter = Converter;
