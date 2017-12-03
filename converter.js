@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const stripJsonComments = require("strip-json-comments");
 const _ = require("lodash");
+const deepMapKeys = require('deep-map-keys');
 
 // Reserved keywords in typescript
 const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else",
@@ -53,6 +54,15 @@ class Converter {
                 if (namespace['$import']) this.namespaces[namespace.namespace]['$import'] = namespace['$import']
             }
         }
+    }
+
+    setUnsupportedAsOptional() {
+        this.namespaces = deepMapKeys(this.namespaces, (key) => {
+            if (key === 'unsupported') {
+                return 'optional';
+            }
+            return key;
+        })
     }
 
     convert() {
@@ -371,11 +381,11 @@ class Converter {
         return convertedParameters;
     }
 
-    convertSingleFunction(name, parameters, returnType, arrow, classy) {
+    convertSingleFunction(name, parameters, returnType, arrow, classy, optional) {
         // function x() {} or () => {}?
         if (arrow) {
             // Okay () => {}, unless we want it classy (inside a class) in which case use name(): {}
-            return `${classy ? `${name}` : ''}(${parameters.join(', ')})${classy ? ':' : ' =>'} ${returnType}`;
+            return `${classy ? `${name}${optional ? '?' : ''}` : ''}(${parameters.join(', ')})${classy ? ':' : ' =>'} ${returnType}`;
         } else {
             // If the name is a reversed keyword
             if (RESERVED.includes(name)) {
@@ -383,7 +393,11 @@ class Converter {
                 this.additionalTypes.push(`export {_${name} as ${name}};`);
                 name = '_' + name;
             }
-            return `function ${name}(${parameters.join(', ')}): ${returnType};`;
+            if (optional) {
+                return `const ${name}: ((${parameters.join(', ')}) => ${returnType}) | undefined;`
+            } else {
+                return `function ${name}(${parameters.join(', ')}): ${returnType};`;
+            }
         }
     }
 
@@ -421,7 +435,7 @@ class Converter {
         // So we get an function that's '(one, two) | (two)' instead of '(one?, two)'
         for (let i = 0; i < parameters.length; i++) {
             if (parameters[i].includes('?') && parameters.length > i + 1) {
-                out += this.convertSingleFunction(func.name, parameters.slice(i + 1), returnType, arrow, classy) + (classy ? ';\n' : '\n');
+                out += this.convertSingleFunction(func.name, parameters.slice(i + 1), returnType, arrow, classy, func.optional) + (classy ? ';\n' : '\n');
             } else {
                 break;
             }
@@ -433,7 +447,7 @@ class Converter {
             return x;
         });
 
-        out += this.convertSingleFunction(func.name, parameters, returnType, arrow, classy);
+        out += this.convertSingleFunction(func.name, parameters, returnType, arrow, classy, func.optional);
 
         return out;
     }
@@ -482,7 +496,7 @@ class Converter {
         });
 
         // Add const and ; if we're not in a class
-        out = `${!classy ? 'const ' : ''}${event.name}: ${this.convertSingleEvent(parameters, returnType, classy)}${out}${!classy ? ';' : ''}`;
+        out = `${!classy ? 'const ' : ''}${event.name}: ${this.convertSingleEvent(parameters, returnType, classy)}${out}${!classy && event.optional ? ' | undefined' : ''}${!classy ? ';' : ''}`;
 
         return out;
     }

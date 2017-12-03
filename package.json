@@ -12,6 +12,8 @@
   "devDependencies": {
     "lodash": "^4.17.4",
     "minimist": "^1.2.0",
-    "strip-json-comments": "^2.0.1"
-  }
+    "strip-json-comments": "^2.0.1",
+    "deep-map-keys": "^1.2.0"
+  },
+  "dependencies": {}
 }

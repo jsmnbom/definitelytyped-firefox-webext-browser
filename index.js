@@ -40,6 +40,7 @@ interface Window {
 `;
 
 let converter = new Converter(argv['s'], HEADER, NAMESPACE_ALIASES);
+converter.setUnsupportedAsOptional();
 
 /* Customizations */
 // Remove test namespace since it's not exposed in api
