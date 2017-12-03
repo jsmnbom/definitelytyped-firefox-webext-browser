@@ -175,7 +175,7 @@ class Converter {
                 enum: enums
             });
             // For each choice, convert according to rules, join via a pipe "|" and add to output
-            out += choices.map(x => {
+            out += _.uniqWith(choices.map(x => {
                 // Override id with parent id for proper naming
                 x.id = type.id;
                 // Convert it as a type
@@ -184,7 +184,7 @@ class Converter {
                 // This is due to how "string | any" === "any" and the whole choice would therefore be redundant
                 if (y === 'any') y = 'object';
                 return y;
-            }).join(' | ');
+            }), _.isEqual).join(' | ');
         } else if (type.enum) {
             // If it's an enum
             // Make sure it has a proper id
