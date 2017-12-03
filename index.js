@@ -17,7 +17,7 @@ const argv = require("minimist")(process.argv.slice(2), {
 const Converter = require("./converter").Converter;
 
 // Namespace references that need renaming
-const NAMESPACE_ALIASES = {contextMenusInternal: 'menusInternal'};
+const NAMESPACE_ALIASES = {'contextMenusInternal': 'menusInternal', 'manifest': '_manifest'};
 
 // Header of the definitions file
 const HEADER = `// Type definitions for WebExtension Development in FireFox ${argv['f']}
@@ -45,14 +45,14 @@ let converter = new Converter(argv['s'], HEADER, NAMESPACE_ALIASES);
 // Remove test namespace since it's not exposed in api
 converter.removeNamespace('test');
 // Remove manifest.WebExtensionLangpackManifest as it's not exposed api
-converter.remove('manifest', 'types', 'WebExtensionLangpackManifest');
+converter.remove('_manifest', 'types', 'WebExtensionLangpackManifest');
 // browser.runtime.getManifest should return WebExtensionManifest
 converter.edit('runtime', 'functions', 'getManifest', x => {
     x.returns = {'$ref': 'manifest.WebExtensionManifest'};
     return x;
 });
 // Remove NativeManifest since it's not an exposed api
-converter.remove('manifest', 'types', 'NativeManifest');
+converter.remove('_manifest', 'types', 'NativeManifest');
 
 converter.convert();
 converter.write(argv['o']);
