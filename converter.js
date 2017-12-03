@@ -44,6 +44,8 @@ class Converter {
                 if (namespace.properties) this.namespaces[namespace.namespace].properties = Object.assign(this.namespaces[namespace.namespace].properties, namespace.properties);
                 if (namespace.functions) this.namespaces[namespace.namespace].functions = this.namespaces[namespace.namespace].functions.concat(namespace.functions);
                 if (namespace.events) this.namespaces[namespace.namespace].events = this.namespaces[namespace.namespace].events.concat(namespace.events);
+
+                if (namespace['$import']) this.namespaces[namespace.namespace]['$import'] = namespace['$import']
             }
         }
     }
@@ -493,6 +495,17 @@ class Converter {
         // Get data for this namespace
         let data = this.namespaces[this.namespace];
         let out = '';
+
+        if (data['$import']) {
+            _.mergeWith(data, this.namespaces[data['$import']], (objValue, srcValue, key) => {
+                if (key === 'namespace') return objValue;
+                if (_.isArray(objValue)) {
+                    return _.uniqWith(objValue.concat(srcValue), (arrVal, othVal) => {
+                        return (arrVal.id !== undefined && arrVal.id === othVal.id) || (arrVal.name !== undefined && arrVal.name === othVal.name);
+                    });
+                }
+            });
+        }
 
         // Clear additional types
         this.additionalTypes = [];
