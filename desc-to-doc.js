@@ -24,7 +24,7 @@ function convertLinks(html) {
 }
 
 /**
- * converts an html description from the extension manifests to markdown for a doc comemnt
+ * converts an html description from the extension manifests to markdown for a doc comment
  */
 function descToMarkdown(description) {
     description = convertLinks(description);
