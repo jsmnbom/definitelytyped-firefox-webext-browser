@@ -3,6 +3,7 @@ const path = require("path");
 const stripJsonComments = require("strip-json-comments");
 const _ = require("lodash");
 const deepMapKeys = require('deep-map-keys');
+const {descToMarkdown, toDocComment} = require("./desc-to-doc.js");
 
 // Reserved keywords in typescript
 const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else",
@@ -42,7 +43,9 @@ class Converter {
                         types: [],
                         properties: {},
                         functions: [],
-                        events: []
+                        events: [],
+                        description: "",
+                        permissions: []
                     };
                 }
                 // Concat or extend namespace
@@ -50,6 +53,8 @@ class Converter {
                 if (namespace.properties) this.namespaces[namespace.namespace].properties = Object.assign(this.namespaces[namespace.namespace].properties, namespace.properties);
                 if (namespace.functions) this.namespaces[namespace.namespace].functions = this.namespaces[namespace.namespace].functions.concat(namespace.functions);
                 if (namespace.events) this.namespaces[namespace.namespace].events = this.namespaces[namespace.namespace].events.concat(namespace.events);
+                if (namespace.description) this.namespaces[namespace.namespace].description = namespace.description;
+                if (namespace.permissions) this.namespaces[namespace.namespace].permissions = this.namespaces[namespace.namespace].permissions.concat(namespace.permissions);
 
                 if (namespace['$import']) this.namespaces[namespace.namespace]['$import'] = namespace['$import']
             }
@@ -538,6 +543,34 @@ class Converter {
         this.additionalTypes = _.uniqWith(this.additionalTypes, _.isEqual);
 
         // Output everything if needed
+
+        // Comment the description and permissions/manifest keys
+        let doclines = [];
+        if (data.description) {
+            doclines.push(descToMarkdown(data.description));
+        }
+        if (data.permissions && data.permissions.length > 0) {
+            // Manifest keys are in the permissions array, but start with "manifest:"
+            const permissions = [];
+            const manifestKeys = [];
+            for (const perm of data.permissions) {
+                if (/^manifest:(.*)/.exec(perm)) {
+                    manifestKeys.push(RegExp.$1);
+                } else {
+                    permissions.push(perm);
+                }
+            }
+            if (permissions.length > 0) {
+                doclines.push(`Permissions: ${permissions.map(p => `\`${p}\``).join(", ")}`);
+            }
+            if (manifestKeys.length > 0) {
+                doclines.push(`Manifest keys: ${manifestKeys.map(p => `\`${p}\``).join(", ")}`);
+            }
+        }
+        if (doclines.length > 0) {
+            out += toDocComment(doclines.join("\n\n")) + "\n";
+        }
+
         out += `declare namespace browser.${data.namespace} {\n`;
         if (this.types.length > 0) out += `/* ${data.namespace} types */\n${this.types.join('\n\n')}\n\n`;
         if (this.additionalTypes.length > 0) out += `${this.additionalTypes.join('\n\n')}\n\n`;
