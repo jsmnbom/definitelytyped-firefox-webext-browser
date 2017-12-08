@@ -1,4 +1,5 @@
 const toMarkdown = require("to-markdown");
+const {URL} = require("url");
 
 function prefixLines(s, prefix) {
     const escapedReplacement = prefix.replace(/\$/g, "$$$$");
@@ -23,12 +24,35 @@ function convertLinks(html) {
     return html;
 }
 
+function isValidURL (url) {
+    try {
+        new URL(url);
+        return true;
+    } catch (_ignore) {
+        return false;
+    }
+}
+
+// un-linkify links to just fragment identifiers or relative urls meant for chrome docs pages
+const toMarkdownOptions = {
+    converters: [
+        {
+            filter: (element) => {
+                return element.tagName === "A" && !isValidURL(element.getAttribute("href"));
+            },
+            replacement: (content) => {
+                return content;
+            }
+        }
+    ]
+};
+
 /**
  * converts an html description from the extension manifests to markdown for a doc comment
  */
 function descToMarkdown(description) {
     description = convertLinks(description);
-    description = toMarkdown(description);
+    description = toMarkdown(description, toMarkdownOptions);
     return description;
 }
 

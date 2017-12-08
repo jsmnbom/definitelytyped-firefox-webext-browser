@@ -123,8 +123,11 @@ class Converter {
                 let propertyType = type.properties[name];
                 // Make sure it has a proper id by adding parent id to id
                 propertyType.id = type.id + (name === 'properties' ? '' : ('_' + name));
+                // Comment
+                let comment = (propertyType.description) ?
+                    toDocComment(descToMarkdown(propertyType.description)) + "\n" : "";
                 // Output property type (adding a ? if optional)
-                convertedProperties.push(`${name}${type.properties[name].optional ? '?' : ''}: ${this.convertType(propertyType)}`);
+                convertedProperties.push(`${comment}${name}${type.properties[name].optional ? '?' : ''}: ${this.convertType(propertyType)}`);
             }
         }
         // For each pattern property
