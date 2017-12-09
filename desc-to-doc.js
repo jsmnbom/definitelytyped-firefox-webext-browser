@@ -33,16 +33,30 @@ function isValidURL (url) {
     }
 }
 
-// un-linkify links to just fragment identifiers or relative urls meant for chrome docs pages
 const toMarkdownOptions = {
     converters: [
+        // un-linkify links to just fragment identifiers or relative urls meant for chrome docs pages
         {
-            filter: (element) => {
-                return element.tagName === "A" && !isValidURL(element.getAttribute("href"));
-            },
-            replacement: (content) => {
-                return content;
-            }
+            filter: (element) => (element.tagName === "A") && !isValidURL(element.getAttribute("href")),
+            replacement: (content) => content,
+        },
+        // variable name
+        {
+            filter: "var",
+            replacement: (content) => `\`${content}\``,
+        },
+        // markdown has no definition lists, imitate them
+        {
+            filter: "dl",
+            replacement: (content) => `${content}\n`,
+        },
+        {
+            filter: "dt",
+            replacement: (content) => `*${content}*:\n`,
+        },
+        {
+            filter: "dd",
+            replacement: (content) => `  ${content}  \n`,
         }
     ]
 };
