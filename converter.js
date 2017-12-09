@@ -13,6 +13,10 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 // Types that are considered "simple"
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
 
+// Creates a doc comment out of a schema's description
+const commentFromSchema = schema => (schema.description) ?
+    toDocComment(descToMarkdown(schema.description)) + "\n" : "";
+
 class Converter {
     constructor(folders, header, namespace_aliases) {
         // Generated source
@@ -123,11 +127,8 @@ class Converter {
                 let propertyType = type.properties[name];
                 // Make sure it has a proper id by adding parent id to id
                 propertyType.id = type.id + (name === 'properties' ? '' : ('_' + name));
-                // Comment
-                let comment = (propertyType.description) ?
-                    toDocComment(descToMarkdown(propertyType.description)) + "\n" : "";
                 // Output property type (adding a ? if optional)
-                convertedProperties.push(`${comment}${name}${type.properties[name].optional ? '?' : ''}: ${this.convertType(propertyType)}`);
+                convertedProperties.push(`${commentFromSchema(propertyType)}${name}${type.properties[name].optional ? '?' : ''}: ${this.convertType(propertyType)}`);
             }
         }
         // For each pattern property
@@ -216,11 +217,11 @@ class Converter {
             if (root) {
                 // So if we are in the root
                 // Add each enum value, sanitizing the name (if it has one, otherwise just using its value as name)
-                out += `{\n${type.enum.map(x => `${(x.name ? x.name : x).replace(/\W/g, '')} = "${x.name ? x.name : x}"`).join(',\n')}\n}`
+                out += `{\n${type.enum.map(x => `${commentFromSchema(x)}${(x.name ? x.name : x).replace(/\W/g, '')} = "${x.name ? x.name : x}"`).join(',\n')}\n}`
             } else {
                 // If we're not in the root, add the enum as an additional type instead, adding an _ in front of the name
                 // We convert the actual enum based on rules above by passing through the whole type code again, but this time as root
-                this.additionalTypes.push(`enum _${this.convertEnumName(type.id)} ${this.convertType(type, true)}`);
+                this.additionalTypes.push(`${commentFromSchema(type)}enum _${this.convertEnumName(type.id)} ${this.convertType(type, true)}`);
                 // And then just reference it by name in output
                 out += '_' + this.convertEnumName(type.id);
             }
