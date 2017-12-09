@@ -14,8 +14,19 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
 
 // Creates a doc comment out of a schema's description
-const commentFromSchema = (schema, prefix = "\n") => (schema.description) ?
-    toDocComment(descToMarkdown(schema.description)) + prefix : "";
+function commentFromSchema (schema, suffix = "\n") {
+    let doclines = [];
+    if (schema.description) {
+        doclines.push(descToMarkdown(schema.description));
+    }
+    if (schema.deprecated) {
+        doclines.push(`@deprecated ${descToMarkdown(schema.deprecated)}`);
+    }
+    if (doclines.length === 0) {
+        return "";
+    }
+    return toDocComment(doclines.join("\n")) + suffix;
+}
 
 class Converter {
     constructor(folders, header, namespace_aliases) {
