@@ -54,6 +54,17 @@ converter.edit('runtime', 'functions', 'getManifest', x => {
 });
 // Remove NativeManifest since it's not an exposed api
 converter.remove('_manifest', 'types', 'NativeManifest');
+// Fix events dealing with messages
+for (let path of [
+    ['runtime', 'events', 'onMessage'],
+    ['runtime', 'events', 'onMessageExternal'],
+    ['extension', 'events', 'onRequest'],
+    ['extension', 'events', 'onRequestExternal'],
+]) converter.edit(...path, x => {
+    // The message parameter actually isn't optional
+    x.parameters[0].optional = false;
+    return x;
+});
 
 converter.convert();
 converter.write(argv['o']);
