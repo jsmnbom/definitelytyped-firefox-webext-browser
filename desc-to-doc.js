@@ -6,11 +6,19 @@ function prefixLines(s, prefix) {
     return s.replace(/^.*$/gm, `${escapedReplacement}$&`);
 }
 
+const DOC_START = "/**";
+const DOC_CONT = " * ";
+const DOC_END = " */";
+
 /**
  * converts a string to a doc comment
  */
 function toDocComment(content) {
-    return "/**\n" + prefixLines(content, " * ") + "\n */";
+    const isSingleLine = content.indexOf("\n") === content.lastIndexOf("\n");
+    if (isSingleLine) {
+        return DOC_START + " " + content + DOC_END;
+    }
+    return DOC_START + "\n" + prefixLines(content, " * ") + "\n" + DOC_END;
 }
 
 function convertLinks(html) {
