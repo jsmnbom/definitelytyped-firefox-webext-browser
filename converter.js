@@ -344,19 +344,21 @@ class Converter {
             if (convertedType === undefined) continue;
             // If we get its id in return, it's being weird and should just not be typechecked
             if (convertedType === type.id) convertedType = 'any';
+            // Get the comment
+            let comment = commentFromSchema(type);
             // Add converted source with proper keyword in front
             // This is here instead of in convertType, since that is also used for non root purposes
             if (type.functions || type.events) {
                 // If it has functions or events it's a class
-                convertedTypes.push(`class ${type.id} ${convertedType}`);
+                convertedTypes.push(`${comment}class ${type.id} ${convertedType}`);
             } else if (type.enum) {
-                convertedTypes.push(`enum ${this.convertEnumName(type.id)} ${convertedType}`);
+                convertedTypes.push(`${comment}enum ${this.convertEnumName(type.id)} ${convertedType}`);
             } else if (type.type === 'object' && !type.isInstanceOf) {
                 // It's an object, that's not an instance of another one
-                convertedTypes.push(`interface ${type.id} ${convertedType}`);
+                convertedTypes.push(`${comment}interface ${type.id} ${convertedType}`);
             } else {
                 // It's just a type of some kind
-                convertedTypes.push(`type ${type.id} = ${convertedType};`);
+                convertedTypes.push(`${comment}type ${type.id} = ${convertedType};`);
             }
         }
         return convertedTypes
@@ -367,7 +369,7 @@ class Converter {
         let convertedProperties = [];
         // For each property, just add it as a const, appending | undefined if it's optional
         for (let prop of Object.keys(properties)) {
-            convertedProperties.push(`const ${prop}: ${this.convertType(properties[prop])}${properties[prop].optional ? ' | undefined' : ''};`);
+            convertedProperties.push(`${commentFromSchema(properties[prop])}const ${prop}: ${this.convertType(properties[prop])}${properties[prop].optional ? ' | undefined' : ''};`);
         }
         return convertedProperties;
     }
@@ -484,6 +486,9 @@ class Converter {
         if (event.returns) {
             returnType = this.convertType(event.returns);
         }
+
+        // Comment it
+        out += commentFromSchema(event);
 
         // Get parameters
         let parameters = this.convertParameters(event.parameters, true);
