@@ -14,8 +14,8 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
 
 // Creates a doc comment out of a schema's description
-const commentFromSchema = schema => (schema.description) ?
-    toDocComment(descToMarkdown(schema.description)) + "\n" : "";
+const commentFromSchema = (schema, prefix = "\n") => (schema.description) ?
+    toDocComment(descToMarkdown(schema.description)) + prefix : "";
 
 class Converter {
     constructor(folders, header, namespace_aliases) {
@@ -382,8 +382,11 @@ class Converter {
             // If it's a function and that function is 'callback' we skip it since we don't use callbacks but promises instead
             if (parameters[parameter].type && parameters[parameter].name && parameters[parameter].type === 'function' && parameters[parameter].name === 'callback') continue;
             let out = '';
-            // If includeName then include the name (add ? if optional)
-            if (includeName) out += `${parameters[parameter].name ? parameters[parameter].name : parameter}${parameters[parameter].optional ? '?' : ''}: `;
+            // If includeName then include the name (add ? if optional) and a comment before it
+            if (includeName) {
+                out += commentFromSchema(parameters[parameter], " ");
+                out += `${parameters[parameter].name ? parameters[parameter].name : parameter}${parameters[parameter].optional ? '?' : ''}: `;
+            }
             // Convert the paremeter type passing parent id as id
             parameters[parameter].id = name;
             out += this.convertType(parameters[parameter]);
@@ -414,6 +417,7 @@ class Converter {
 
     convertFunction(func, arrow = false, classy = false) {
         let out = '';
+        out += commentFromSchema(func);
         // Assume it returns void until proven otherwise
         let returnType = 'void';
         // Prove otherwise? either a normal returns or as an async promise
@@ -487,9 +491,6 @@ class Converter {
             returnType = this.convertType(event.returns);
         }
 
-        // Comment it
-        out += commentFromSchema(event);
-
         // Get parameters
         let parameters = this.convertParameters(event.parameters, true);
         // Typescript can't handle when e.g. parameter 1 is optional, but parameter 2 isn't
@@ -511,6 +512,9 @@ class Converter {
 
         // Add const and ; if we're not in a class
         out = `${!classy ? 'const ' : ''}${event.name}: ${this.convertSingleEvent(parameters, returnType, classy)}${out}${!classy && event.optional ? ' | undefined' : ''}${!classy ? ';' : ''}`;
+
+        // Comment it
+        out = commentFromSchema(event) + out;
 
         return out;
     }
