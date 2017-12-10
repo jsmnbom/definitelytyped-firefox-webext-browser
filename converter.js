@@ -22,6 +22,9 @@ function commentFromSchema(schema, suffix = '\n') {
     if (schema.deprecated) {
         doclines.push(`@deprecated ${descToMarkdown(schema.deprecated)}`);
     }
+    if (schema.returns && schema.returns.description) {
+        doclines.push(`@returns ${descToMarkdown(schema.returns.description)}`);
+    }
     if (doclines.length === 0) {
         return '';
     }
