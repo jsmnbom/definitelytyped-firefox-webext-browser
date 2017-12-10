@@ -462,12 +462,13 @@ class Converter {
     convertSingleEvent(parameters, returnType, extra, name) {
         if (extra) {
             // It has extra parameters, so output custom event handler
-            this.additionalTypes.push(`interface ${this.namespace}${this.convertName(name)}Listener<T extends (...args: any[]) => any> {
+            let listenerName = this.convertName(`${this.namespace}_${name}_Listener`);
+            this.additionalTypes.push(`interface ${listenerName}<T = (${parameters.join(', ')}) => ${returnType}> {
     addListener: (callback: T, ${extra.join(', ')}) => void;
     removeListener: (listener: T) => void;
     hasListener: (listener: T) => boolean;
 }`);
-            return `${this.namespace}${this.convertName(name)}Listener<(${parameters.join(', ')}) => ${returnType}>`;
+            return `${listenerName}`;
         } else {
             // It has no extra parameters, so just use the helper that we define in HEADER
             return `WebExtEventListener<(${parameters.join(', ')}) => ${returnType}>`;
