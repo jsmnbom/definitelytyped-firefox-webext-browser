@@ -405,7 +405,7 @@ class Converter {
         // Prove otherwise? either a normal returns or as an async promise
         if (func.returns) {
             returnType = this.convertType(func.returns);
-            if (func.returns.optional) returnType += ' | void';
+            if (func.returns.optional && (returnType !== 'any' || returnType !== 'void')) returnType += ' | void';
         } else if (func.async === 'callback') {
             // If it's async then find the callback function and convert it to a promise
             let callback = func.parameters.find(x => x.type === 'function' && x.name === 'callback');
@@ -473,7 +473,7 @@ class Converter {
         // Prove otherwise?
         if (event.returns) {
             returnType = this.convertType(event.returns);
-            if (event.returns.optional) returnType += ' | void';
+            if (event.returns.optional && (returnType !== 'any' || returnType !== 'void')) returnType += ' | void';
         }
 
         // Get parameters
