@@ -3,7 +3,7 @@ const path = require("path");
 const stripJsonComments = require("strip-json-comments");
 const _ = require("lodash");
 const deepMapKeys = require('deep-map-keys');
-const {descToMarkdown, toDocComment} = require("./desc-to-doc.js");
+const {descToMarkdown, toDocComment} = require('./desc-to-doc.js');
 
 // Reserved keywords in typescript
 const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else",
@@ -14,7 +14,7 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
 
 // Creates a doc comment out of a schema's description
-function commentFromSchema (schema, suffix = "\n") {
+function commentFromSchema(schema, suffix = '\n') {
     let doclines = [];
     if (schema.description) {
         doclines.push(descToMarkdown(schema.description));
@@ -23,9 +23,9 @@ function commentFromSchema (schema, suffix = "\n") {
         doclines.push(`@deprecated ${descToMarkdown(schema.deprecated)}`);
     }
     if (doclines.length === 0) {
-        return "";
+        return '';
     }
-    return toDocComment(doclines.join("\n")) + suffix;
+    return toDocComment(doclines.join('\n')) + suffix;
 }
 
 class Converter {
@@ -59,7 +59,7 @@ class Converter {
                         properties: {},
                         functions: [],
                         events: [],
-                        description: "",
+                        description: '',
                         permissions: []
                     };
                 }
@@ -395,7 +395,7 @@ class Converter {
             let out = '';
             // If includeName then include the name (add ? if optional) and a comment before it
             if (includeName) {
-                out += commentFromSchema(parameters[parameter], " ");
+                out += commentFromSchema(parameters[parameter], ' ');
                 out += `${parameters[parameter].name ? parameters[parameter].name : parameter}${parameters[parameter].optional ? '?' : ''}: `;
             }
             // Convert the paremeter type passing parent id as id
@@ -575,9 +575,9 @@ class Converter {
         }
         if (data.permissions && data.permissions.length > 0) {
             // Manifest keys are in the permissions array, but start with "manifest:"
-            const permissions = [];
-            const manifestKeys = [];
-            for (const perm of data.permissions) {
+            let permissions = [];
+            let manifestKeys = [];
+            for (let perm of data.permissions) {
                 if (/^manifest:(.*)/.exec(perm)) {
                     manifestKeys.push(RegExp.$1);
                 } else {
@@ -585,14 +585,14 @@ class Converter {
                 }
             }
             if (permissions.length > 0) {
-                doclines.push(`Permissions: ${permissions.map(p => `\`${p}\``).join(", ")}`);
+                doclines.push(`Permissions: ${permissions.map(p => `\`${p}\``).join(', ')}`);
             }
             if (manifestKeys.length > 0) {
-                doclines.push(`Manifest keys: ${manifestKeys.map(p => `\`${p}\``).join(", ")}`);
+                doclines.push(`Manifest keys: ${manifestKeys.map(p => `\`${p}\``).join(', ')}`);
             }
         }
         if (doclines.length > 0) {
-            out += toDocComment(doclines.join("\n\n")) + "\n";
+            out += toDocComment(doclines.join('\n\n')) + '\n';
         }
 
         out += `declare namespace browser.${data.namespace} {\n`;
