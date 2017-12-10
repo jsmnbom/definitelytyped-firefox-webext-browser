@@ -14,7 +14,7 @@ const DOC_END = ' */';
  * converts a string to a doc comment
  */
 function toDocComment(content) {
-    let isSingleLine = content.indexOf('\n') === content.lastIndexOf('\n');
+    let isSingleLine = !content.includes('\n');
     if (isSingleLine) {
         return DOC_START + ' ' + content + DOC_END;
     }
