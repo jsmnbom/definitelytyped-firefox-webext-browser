@@ -545,8 +545,9 @@ class Converter {
         let out = '';
 
         if (data['$import']) {
+            let skipKeys = ['namespace', 'description', 'permissions'];
             _.mergeWith(data, this.namespaces[data['$import']], (objValue, srcValue, key) => {
-                if (key === 'namespace') return objValue;
+                if (skipKeys.includes(key)) return objValue;
                 if (_.isArray(objValue)) {
                     return _.uniqWith(objValue.concat(srcValue), (arrVal, othVal) => {
                         return (arrVal.id !== undefined && arrVal.id === othVal.id) || (arrVal.name !== undefined && arrVal.name === othVal.name);
