@@ -21,16 +21,6 @@ function toDocComment(content) {
     return DOC_START + '\n' + prefixLines(content, DOC_CONT) + '\n' + DOC_END;
 }
 
-function convertLinks(html) {
-    // reference to another thing in code
-    // > The $(ref:runtime.onConnect) event is fired [...]
-    html = html.replace(/\$\(ref:(.*?)\)/g, '<code>$1</code>');
-    // link to chrome docs
-    // > For more details, see $(topic:messaging)[Content Script Messaging].
-    html = html.replace(/\$\(topic:(.*?)\)\[(.*?)\]/g, '$2');
-    return html;
-}
-
 function isValidURL(url) {
     try {
         new URL(url);
@@ -72,8 +62,21 @@ const toMarkdownOptions = {
  * converts an html description from the extension manifests to markdown for a doc comment
  */
 function descToMarkdown(description) {
-    description = convertLinks(description);
+
+    // reference to another thing in code
+    // > The $(ref:runtime.onConnect) event is fired [...]
+    description = description.replace(/\$\(ref:(.*?)\)/g, '<code>$1</code>');
+    // link to chrome docs
+    // > For more details, see $(topic:messaging)[Content Script Messaging].
+    description = description.replace(/\$\(topic:(.*?)\)\[(.*?)\]/g, '$2');
+    // chrome.* -> browser.*
+    description = description.replace(/\bchrome\.(?=[a-zA-Z])/, 'browser.');
+
     description = toMarkdown(description, toMarkdownOptions);
+
+    // a few descriptions contain "<webview>" which is interpreted as an unclosed tag, fix it
+    description = description.replace(/<\/webview>$/, '').replace(/<webview>(?!\s)(?!$)/, '<webview> ');
+
     return description;
 }
 
