@@ -362,14 +362,11 @@ class Converter {
             let comment = commentFromSchema(type);
             // Add converted source with proper keyword in front
             // This is here instead of in convertType, since that is also used for non root purposes
-            if (type.functions || type.events) {
-                // If it has functions or events it's a class
-                convertedTypes.push(`${comment}class ${type.id} ${convertedType}`);
+            if ((type.functions || type.events) || (type.type === 'object' && !type.isInstanceOf)) {
+                // If it has functions or events, or is an object that's not an instance of another one, it's an interface
+                convertedTypes.push(`${comment}interface ${type.id} ${convertedType}`);
             } else if (type.enum) {
                 convertedTypes.push(`${comment}enum ${this.convertEnumName(type.id)} ${convertedType}`);
-            } else if (type.type === 'object' && !type.isInstanceOf) {
-                // It's an object, that's not an instance of another one
-                convertedTypes.push(`${comment}interface ${type.id} ${convertedType}`);
             } else {
                 // It's just a type of some kind
                 convertedTypes.push(`${comment}type ${type.id} = ${convertedType};`);
