@@ -68,6 +68,7 @@ for (let path of [
         {
             name: 'response',
             type: 'any',
+            optional: true,
         }
     ];
     return x;
