@@ -23,7 +23,7 @@ function commentFromSchema(schema) {
         for (let param of schema.parameters) {
             // Callbacks are skipped in other parts of the code as well
             if (param.type === 'function' && param.name === 'callback') continue;
-            // Braces around optional parameter names is a jsdoc convention
+            // Square brackets around optional parameter names is a jsdoc convention
             let name = (param.optional) ? `[${param.name}]` : param.name;
             let desc = (param.description) ? ' ' + descToMarkdown(param.description) : '';
             doclines.push(`@param ${name}${desc}`);
