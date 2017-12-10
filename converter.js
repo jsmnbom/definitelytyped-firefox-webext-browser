@@ -14,10 +14,20 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
 
 // Creates a doc comment out of a schema's description
-function commentFromSchema(schema, suffix = '\n') {
+function commentFromSchema(schema) {
     let doclines = [];
     if (schema.description) {
         doclines.push(descToMarkdown(schema.description));
+    }
+    if (schema.parameters) {
+        for (let param of schema.parameters) {
+            // Callbacks are skipped in other parts of the code as well
+            if (param.type === 'function' && param.name === 'callback') continue;
+            // Braces around optional parameter names is a jsdoc convention
+            let name = (param.optional) ? `[${param.name}]` : param.name;
+            let desc = (param.description) ? ' ' + descToMarkdown(param.description) : '';
+            doclines.push(`@param ${name}${desc}`);
+        }
     }
     if (schema.deprecated) {
         doclines.push(`@deprecated ${descToMarkdown(schema.deprecated)}`);
@@ -28,7 +38,7 @@ function commentFromSchema(schema, suffix = '\n') {
     if (doclines.length === 0) {
         return '';
     }
-    return toDocComment(doclines.join('\n')) + suffix;
+    return toDocComment(doclines.join('\n')) + '\n';
 }
 
 class Converter {
@@ -393,11 +403,8 @@ class Converter {
             // If it's a function and that function is 'callback' we skip it since we don't use callbacks but promises instead
             if (parameters[parameter].type && parameters[parameter].name && parameters[parameter].type === 'function' && parameters[parameter].name === 'callback') continue;
             let out = '';
-            // If includeName then include the name (add ? if optional) and a comment before it
-            if (includeName) {
-                out += commentFromSchema(parameters[parameter], ' ');
-                out += `${parameters[parameter].name ? parameters[parameter].name : parameter}${parameters[parameter].optional ? '?' : ''}: `;
-            }
+            // If includeName then include the name (add ? if optional)
+            if (includeName) out += `${parameters[parameter].name ? parameters[parameter].name : parameter}${parameters[parameter].optional ? '?' : ''}: `;
             // Convert the paremeter type passing parent id as id
             parameters[parameter].id = name;
             out += this.convertType(parameters[parameter]);
@@ -428,7 +435,10 @@ class Converter {
 
     convertFunction(func, arrow = false, classy = false) {
         let out = '';
-        out += commentFromSchema(func);
+        // Only comment proper functions and methods where the comment can apply
+        if (!arrow || classy) {
+            out += commentFromSchema(func);
+        }
         // Assume it returns void until proven otherwise
         let returnType = 'void';
         // Prove otherwise? either a normal returns or as an async promise
