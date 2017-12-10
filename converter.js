@@ -408,7 +408,8 @@ class Converter {
             if (func.returns.optional) returnType += ' | void';
         } else if (func.async === 'callback') {
             // If it's async then find the callback function and convert it to a promise
-            let parameters = this.convertParameters(func.parameters.find(x => x.type === 'function' && x.name === 'callback').parameters, false, func.name);
+            let callback = func.parameters.find(x => x.type === 'function' && x.name === 'callback');
+            let parameters = this.convertParameters(callback.parameters, false, func.name);
             if (parameters.length > 1) {
                 // Since these files are originally chrome, some things are a bit weird
                 // Callbacks (which is what chrome uses) have no issues with returning multiple values
@@ -423,7 +424,7 @@ class Converter {
             }
             // Use void as return type if there were no parameters
             // Note that the join is kinda useless (see long comments above)
-            returnType = `Promise<${parameters.join(', ') || 'void'}>`
+            returnType = `Promise<${parameters.join(', ') || 'void'}>${callback.optional ? ' | void' : ''}`
         }
 
         // Get parameters
