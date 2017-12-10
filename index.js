@@ -63,6 +63,13 @@ for (let path of [
 ]) converter.edit(...path, x => {
     // The message parameter actually isn't optional
     x.parameters[0].optional = false;
+    // Add a missing parameter to sendResponse
+    x.parameters[2].parameters = [
+        {
+            name: 'response',
+            type: 'any',
+        }
+    ];
     return x;
 });
 
