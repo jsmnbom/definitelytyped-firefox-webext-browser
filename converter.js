@@ -31,6 +31,8 @@ function commentFromSchema(schema) {
     }
     if (schema.deprecated) {
         doclines.push(`@deprecated ${descToMarkdown(schema.deprecated)}`);
+    } else if (schema.unsupported) {
+        doclines.push(`@deprecated Unsupported on Firefox at this time.`);
     }
     if (schema.returns && schema.returns.description) {
         doclines.push(`@returns ${descToMarkdown(schema.returns.description)}`);
