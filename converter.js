@@ -11,6 +11,7 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 
 // Types that are considered "simple"
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
+const ALREADY_OPTIONAL_RETURNS = ['any', 'undefined', 'void'];
 
 class Converter {
     constructor(folders, header, namespace_aliases) {
@@ -409,9 +410,11 @@ class Converter {
         // Prove otherwise? either a normal returns or as an async promise
         if (func.returns) {
             returnType = this.convertType(func.returns);
+            if (func.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
         } else if (func.async === 'callback') {
             // If it's async then find the callback function and convert it to a promise
-            let parameters = this.convertParameters(func.parameters.find(x => x.type === 'function' && x.name === 'callback').parameters, false, func.name);
+            let callback = func.parameters.find(x => x.type === 'function' && x.name === 'callback');
+            let parameters = this.convertParameters(callback.parameters, false, func.name);
             if (parameters.length > 1) {
                 // Since these files are originally chrome, some things are a bit weird
                 // Callbacks (which is what chrome uses) have no issues with returning multiple values
@@ -426,7 +429,9 @@ class Converter {
             }
             // Use void as return type if there were no parameters
             // Note that the join is kinda useless (see long comments above)
-            returnType = `Promise<${parameters.join(', ') || 'void'}>`
+            let promiseReturn = parameters[0] || 'void';
+            if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
+            returnType = `Promise<${promiseReturn}>`
         }
 
         // Get parameters
@@ -475,6 +480,7 @@ class Converter {
         // Prove otherwise?
         if (event.returns) {
             returnType = this.convertType(event.returns);
+            if (event.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
         }
 
         // Get parameters
