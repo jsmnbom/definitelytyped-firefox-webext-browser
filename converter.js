@@ -11,6 +11,7 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 
 // Types that are considered "simple"
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
+const ALREADY_OPTIONAL_RETURNS = ['any', 'undefined', 'void'];
 
 class Converter {
     constructor(folders, header, namespace_aliases) {
@@ -405,7 +406,7 @@ class Converter {
         // Prove otherwise? either a normal returns or as an async promise
         if (func.returns) {
             returnType = this.convertType(func.returns);
-            if (func.returns.optional && (returnType !== 'any' || returnType !== 'void')) returnType += ' | void';
+            if (func.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
         } else if (func.async === 'callback') {
             // If it's async then find the callback function and convert it to a promise
             let callback = func.parameters.find(x => x.type === 'function' && x.name === 'callback');
@@ -473,7 +474,7 @@ class Converter {
         // Prove otherwise?
         if (event.returns) {
             returnType = this.convertType(event.returns);
-            if (event.returns.optional && (returnType !== 'any' || returnType !== 'void')) returnType += ' | void';
+            if (event.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
         }
 
         // Get parameters
