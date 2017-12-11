@@ -63,6 +63,18 @@ for (let path of [
 ]) converter.edit(...path, x => {
     // The message parameter actually isn't optional
     x.parameters[0].optional = false;
+    // Add a missing parameter to sendResponse
+    x.parameters[2].parameters = [
+        {
+            name: 'response',
+            type: 'any',
+            optional: true,
+        }
+    ];
+    // Runtime events only: Add "Promise<any>" return type, the result gets passed to sendResponse
+    if (path[0] === 'runtime') {
+        x.returns.converterTypeOverride = 'boolean | Promise<any>';
+    }
     return x;
 });
 

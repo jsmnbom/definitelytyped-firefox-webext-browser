@@ -170,6 +170,10 @@ class Converter {
     }
 
     convertType(type, root = false) {
+        // Check if we've overridden it, likely for a type that can't be represented in json schema
+        if (type.converterTypeOverride) {
+            return type.converterTypeOverride;
+        }
         let out = '';
         // Check type of type
         if (type.choices) {
