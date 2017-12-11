@@ -442,11 +442,8 @@ class Converter {
                 this.additionalTypes.push(`export {_${name} as ${name}};`);
                 name = '_' + name;
             }
-            if (optional) {
-                return `const ${name}: ((${parameters.join(', ')}) => ${returnType}) | undefined;`
-            } else {
-                return `function ${name}(${parameters.join(', ')}): ${returnType};`;
-            }
+            // Optional top-level functions aren't supported, because commenting parameters doesn't work for them
+            return `function ${name}(${parameters.join(', ')}): ${returnType};`;
         }
     }
 
