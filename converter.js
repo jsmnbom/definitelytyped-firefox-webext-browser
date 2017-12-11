@@ -425,7 +425,9 @@ class Converter {
             }
             // Use void as return type if there were no parameters
             // Note that the join is kinda useless (see long comments above)
-            returnType = `Promise<${parameters.join(', ') || 'void'}>${callback.optional ? ' | void' : ''}`
+            let promiseReturn = parameters.join(', ') || 'void';
+            if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
+            returnType = `Promise<${promiseReturn}>`
         }
 
         // Get parameters
