@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const stripJsonComments = require("strip-json-comments");
 const _ = require("lodash");
-const deepMapKeys = require('deep-map-keys');
 const {descToMarkdown, toDocComment} = require('./desc-to-doc.js');
 
 // Reserved keywords in typescript
@@ -41,6 +40,23 @@ function commentFromSchema(schema) {
         return '';
     }
     return toDocComment(doclines.join('\n')) + '\n';
+}
+
+// Iterate over plain objects in nested objects and arrays
+function* deepIteratePlainObjects(item) {
+    if (_.isArray(item)) {
+        // Got an array, check its elements
+        for (let x of item) {
+            yield* deepIteratePlainObjects(x);
+        }
+    } else if (_.isPlainObject(item)) {
+        // Got a plain object, yield it
+        yield item;
+        // Check its properties
+        for (let x of Object.values(item)) {
+            yield* deepIteratePlainObjects(x);
+        }
+    }
 }
 
 class Converter {
@@ -92,12 +108,11 @@ class Converter {
     }
 
     setUnsupportedAsOptional() {
-        this.namespaces = deepMapKeys(this.namespaces, (key) => {
-            if (key === 'unsupported') {
-                return 'optional';
+        for (let type of deepIteratePlainObjects(this.namespaces)) {
+            if (type.unsupported) {
+                type.optional = true;
             }
-            return key;
-        })
+        }
     }
 
     convert() {
