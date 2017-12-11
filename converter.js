@@ -462,7 +462,7 @@ class Converter {
     convertSingleEvent(parameters, returnType, extra, name) {
         if (extra) {
             // It has extra parameters, so output custom event handler
-            let listenerName = this.convertName(`${this.namespace}_${name}_Event`);
+            let listenerName = '_' + this.convertName(`${this.namespace}_${name}_Event`);
             this.additionalTypes.push(`type ${listenerName}<T = (${parameters.join(', ')}) => void> = WebExtEventBase<(callback: T, ${extra.join(', ')}) => void, T>;`);
             return `${listenerName}`;
         } else {
