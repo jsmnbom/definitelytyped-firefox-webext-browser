@@ -12,11 +12,28 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 // Types that are considered "simple"
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
 
-// Creates a doc comment out of a schema's description
+// Formats an allowedContexts array to a readable string
+function formatContexts(contexts) {
+    if (!contexts || contexts.length === 0) {
+        return '';
+    }
+    if (contexts.includes('devtools_only')) {
+        return 'Devtools pages only';
+    }
+    return '';
+}
+
+// Creates a doc comment out of a schema object
 function commentFromSchema(schema) {
     let doclines = [];
     if (schema.description) {
         doclines.push(descToMarkdown(schema.description));
+    }
+    let contexts = formatContexts(schema.allowedContexts);
+    if (contexts) {
+        // Separate with an empty line
+        if (doclines.length > 0) doclines.push('');
+        doclines.push(`Contexts: ${contexts}`);
     }
     if (schema.parameters) {
         for (let param of schema.parameters) {
@@ -91,7 +108,8 @@ class Converter {
                         functions: [],
                         events: [],
                         description: '',
-                        permissions: []
+                        permissions: [],
+                        allowedContexts: []
                     };
                 }
                 // Concat or extend namespace
@@ -101,6 +119,7 @@ class Converter {
                 if (namespace.events) this.namespaces[namespace.namespace].events = this.namespaces[namespace.namespace].events.concat(namespace.events);
                 if (namespace.description) this.namespaces[namespace.namespace].description = namespace.description;
                 if (namespace.permissions) this.namespaces[namespace.namespace].permissions = this.namespaces[namespace.namespace].permissions.concat(namespace.permissions);
+                if (namespace.allowedContexts) this.namespaces[namespace.namespace].allowedContexts = this.namespaces[namespace.namespace].allowedContexts.concat(namespace.allowedContexts);
 
                 if (namespace['$import']) this.namespaces[namespace.namespace]['$import'] = namespace['$import']
             }
@@ -615,6 +634,11 @@ class Converter {
             if (manifestKeys.length > 0) {
                 doclines.push(`Manifest keys: ${manifestKeys.map(p => `\`${p}\``).join(', ')}`);
             }
+        }
+        // Allowed contexts
+        let contexts = formatContexts(data.allowedContexts);
+        if (contexts) {
+            doclines.push(`Contexts: ${contexts}`);
         }
         if (doclines.length > 0) {
             out += toDocComment(doclines.join('\n\n')) + '\n';
