@@ -71,6 +71,10 @@ for (let path of [
             optional: true,
         }
     ];
+    // Runtime events only: Add "Promise<any>" return type, the result gets passed to sendResponse
+    if (path[0] === 'runtime') {
+        x.returns.converterTypeOverride = 'boolean | Promise<any>';
+    }
     return x;
 });
 
