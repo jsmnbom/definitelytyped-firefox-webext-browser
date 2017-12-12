@@ -79,6 +79,19 @@ for (let path of [
     }
     return x;
 });
+// Fix webrequest events
+for (let path of [
+    ['webRequest', 'events', 'onAuthRequired'],
+    ['webRequest', 'events', 'onBeforeRequest'],
+    ['webRequest', 'events', 'onBeforeSendHeaders'],
+    ['webRequest', 'events', 'onHeadersReceived'],
+]) converter.edit(...path, x => {
+    // Return type of the callback is weirder than the schemas can express
+    x.returns.converterTypeOverride = 'BlockingResponse | Promise<BlockingResponse>';
+    // It's also optional, since you can choose to just listen to the event
+    x.returns.options = true;
+    return x;
+});
 
 converter.convert();
 converter.write(argv['o']);
