@@ -488,11 +488,12 @@ class Converter {
         return convertedParameters;
     }
 
-    convertSingleFunction(name, parameters, returnType, arrow, classy, optional) {
+    convertSingleFunction(name, returnType, arrow, classy, func) {
+        let parameters = this.convertParameters(func.parameters, true, func.name);
         // function x() {} or () => {}?
         if (arrow) {
             // Okay () => {}, unless we want it classy (inside a class) in which case use name(): {}
-            return `${classy ? `${name}${optional ? '?' : ''}` : ''}(${parameters.join(', ')})${classy ? ':' : ' =>'} ${returnType}`;
+            return `${classy ? `${commentFromSchema(func)}${name}${func.optional ? '?' : ''}` : ''}(${parameters.join(', ')})${classy ? ':' : ' =>'} ${returnType}`;
         } else {
             // If the name is a reversed keyword
             if (RESERVED.includes(name)) {
@@ -501,7 +502,7 @@ class Converter {
                 name = '_' + name;
             }
             // Optional top-level functions aren't supported, because commenting parameters doesn't work for them
-            return `function ${name}(${parameters.join(', ')}): ${returnType};`;
+            return `${commentFromSchema(func)}function ${name}(${parameters.join(', ')}): ${returnType};`;
         }
     }
 
@@ -537,35 +538,72 @@ class Converter {
                 let promiseReturn = parameters[0] || 'void';
                 if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
                 returnType = `Promise<${promiseReturn}>`
+                // Because of namespace extends(?), a few functions can pass through here twice,
+                // so override the return type since the callback was removed and it can't be converted again
+                func.returns = {converterTypeOverride: returnType};
+                // Converted now
+                delete func.async;
             }
         }
-
-        // Only comment proper functions and methods where the comment can apply
-        // This is after the returnType stuff as that code sometimes altars func.parameters
-        if (!arrow || classy) {
-            out += commentFromSchema(func);
+            let callbackIndex = func.parameters.findIndex(x => x.type === 'function' && x.name === 'callback');
+            // Delete the callback parameter
+            let callback = func.parameters.splice(callbackIndex, 1)[0];
+            let parameters = this.convertParameters(callback.parameters, false, func.name);
+            if (parameters.length > 1) {
+                // Since these files are originally chrome, some things are a bit weird
+                // Callbacks (which is what chrome uses) have no issues with returning multiple values
+                // but firefox uses promises, which AFAIK can't handle that
+                // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in question yet
+                // But since it's in the schemas, it's still a problem for us
+                // TODO: Follow firefox developments in this area
+                console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
+                // Just assume it's gonna be some kind of object that's returned from the promise
+                // This seems like the most likely way the firefox team is going to make the promise return multiple values
+                parameters = ['object']
+            }
+            // Use void as return type if there were no parameters
+            // Note that the join is kinda useless (see long comments above)
+            let promiseReturn = parameters[0] || 'void';
+            if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
+            returnType = `Promise<${promiseReturn}>`
         }
 
-        // Get parameters
-        let parameters = this.convertParameters(func.parameters, true, func.name);
+        // Create overload signatures for leading optional parameters
         // Typescript can't handle when e.g. parameter 1 is optional, but parameter 2 isn't
         // Therefore output multiple function choices where we one by one, strip the optional status
-        // So we get an function that's '(one, two) | (two)' instead of '(one?, two)'
-        for (let i = 0; i < parameters.length; i++) {
-            if (parameters[i].includes('?') && parameters.length > i + 1) {
-                out += this.convertSingleFunction(func.name, parameters.slice(i + 1), returnType, arrow, classy, func.optional) + (classy ? ';\n' : '\n');
+
+        // Check if "parameters[index]" is optional with at least one required parameter following it
+        let isLeadingOptional = (parameters, index) => {
+            let firstRequiredIndex = parameters.findIndex(x => !x.optional);
+            return firstRequiredIndex > index;
+        };
+
+        // Optional parameters with at least one required parameter following them, marked as non-optional
+        let leadingOptionals = [];
+        // The rest of the parameters
+        let rest = [];
+        for (let [i, param] of (func.parameters || []).entries()) {
+            if (isLeadingOptional(func.parameters, i)) {
+                // It won't be optional in the overload signature, so create a copy of it marked as non-optional
+                leadingOptionals.push({...param, optional: false});
             } else {
-                break;
+                rest.push(param);
             }
         }
-        parameters = parameters.map((x, i) => {
-            if (parameters.length > 0 && i < parameters.length - 1) {
-                return x.replace('?', '');
-            }
-            return x;
-        });
 
-        out += this.convertSingleFunction(func.name, parameters, returnType, arrow, classy, func.optional);
+        // Output the normal signature
+        out += this.convertSingleFunction(func.name, returnType, arrow, classy, {
+            ...func,
+            parameters: rest,
+        });
+        // Output signatures for any leading optional parameters
+        for (let i = 0; i < leadingOptionals.length; i++) {
+            let funcWithParams = {
+                ...func,
+                parameters: leadingOptionals.slice(i).concat(rest),
+            };
+            out += "\n" + this.convertSingleFunction(func.name, returnType, arrow, classy, funcWithParams) + (classy ? ';\n' : '');
+        }
 
         return out;
     }
