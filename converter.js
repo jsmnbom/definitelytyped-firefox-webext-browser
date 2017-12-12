@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const stripJsonComments = require("strip-json-comments");
 const _ = require("lodash");
-const deepMapKeys = require('deep-map-keys');
+const {descToMarkdown, toDocComment} = require('./desc-to-doc.js');
 
 // Reserved keywords in typescript
 const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else",
@@ -12,6 +12,106 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 // Types that are considered "simple"
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
 const ALREADY_OPTIONAL_RETURNS = ['any', 'undefined', 'void'];
+
+// Readable names for "allowedContexts" values from the schema
+const CONTEXT_NAMES = {
+    'addon_parent': 'Add-on parent',
+    'content':      'Content scripts',
+    'devtools':     'Devtools pages',
+    'proxy':        'Proxy scripts',
+};
+
+// Comment "X context only" for these contexts
+const CTX_CMT_ONLY_ALLOWED_IN = ['content', 'devtools', 'proxy'];
+
+// Comment "Not allowed in" for these contexts
+const CTX_CMT_NOT_ALLOWED_IN = ['content', 'devtools'];
+
+// Comment "Allowed in" for these contexts
+const CTX_CMT_ALLOWED_IN = ['proxy'];
+
+// Formats an allowedContexts array to a readable string
+function formatContexts(contexts, outputAlways = false) {
+    if (!contexts || contexts.length === 0) {
+        if (outputAlways) {
+            // No contexts are specified, but we can likely still output something
+            contexts = [];
+        } else {
+            return '';
+        }
+    }
+    // Check if this thing is only allowed in one context
+    for (let context of contexts) {
+        if (/^(.*)_only$/.exec(context) && CTX_CMT_ONLY_ALLOWED_IN.includes(RegExp.$1)) {
+            return `Allowed in: ${CONTEXT_NAMES[RegExp.$1]} only`;
+        }
+    }
+    let lines = [];
+    // If a context from CTX_CMT_NOT_ALLOWED_IN isn't in contexts, comment it as "not allowed in"
+    let notAllowedIn = CTX_CMT_NOT_ALLOWED_IN.filter(context => !contexts.includes(context));
+    if (notAllowedIn.length > 0) {
+        lines.push(`Not allowed in: ${notAllowedIn.map(ctx => CONTEXT_NAMES[ctx]).join(', ')}`);
+    }
+    // If a context from CTX_CMT_ALLOWED_IN is in contexts, comment it as "allowed in"
+    let allowedIn = CTX_CMT_ALLOWED_IN.filter(context => contexts.includes(context));
+    if (allowedIn.length > 0) {
+        lines.push(`Allowed in: ${allowedIn.map(ctx => CONTEXT_NAMES[ctx]).join(', ')}`);
+    }
+    return (lines.length > 0) ? lines.join('\n\n') : '';
+}
+
+// Creates a doc comment out of a schema object
+function commentFromSchema(schema) {
+    let doclines = [];
+    if (schema.description) {
+        doclines.push(descToMarkdown(schema.description));
+    }
+    let contexts = formatContexts(schema.allowedContexts);
+    if (contexts) {
+        // Separate with an empty line
+        if (doclines.length > 0) doclines.push('');
+        doclines.push(contexts);
+    }
+    if (schema.parameters) {
+        for (let param of schema.parameters) {
+            // Callbacks are skipped in other parts of the code as well
+            if (param.type === 'function' && param.name === 'callback') continue;
+            // Square brackets around optional parameter names is a jsdoc convention
+            let name = (param.optional) ? `[${param.name}]` : param.name;
+            let desc = (param.description) ? ' ' + descToMarkdown(param.description) : '';
+            doclines.push(`@param ${name}${desc}`);
+        }
+    }
+    if (schema.deprecated) {
+        doclines.push(`@deprecated ${descToMarkdown(schema.deprecated)}`);
+    } else if (schema.unsupported) {
+        doclines.push(`@deprecated Unsupported on Firefox at this time.`);
+    }
+    if (schema.returns && schema.returns.description) {
+        doclines.push(`@returns ${descToMarkdown(schema.returns.description)}`);
+    }
+    if (doclines.length === 0) {
+        return '';
+    }
+    return toDocComment(doclines.join('\n')) + '\n';
+}
+
+// Iterate over plain objects in nested objects and arrays
+function* deepIteratePlainObjects(item) {
+    if (_.isArray(item)) {
+        // Got an array, check its elements
+        for (let x of item) {
+            yield* deepIteratePlainObjects(x);
+        }
+    } else if (_.isPlainObject(item)) {
+        // Got a plain object, yield it
+        yield item;
+        // Check its properties
+        for (let x of Object.values(item)) {
+            yield* deepIteratePlainObjects(x);
+        }
+    }
+}
 
 class Converter {
     constructor(folders, header, namespace_aliases) {
@@ -43,7 +143,10 @@ class Converter {
                         types: [],
                         properties: {},
                         functions: [],
-                        events: []
+                        events: [],
+                        description: '',
+                        permissions: [],
+                        allowedContexts: []
                     };
                 }
                 // Concat or extend namespace
@@ -51,6 +154,9 @@ class Converter {
                 if (namespace.properties) this.namespaces[namespace.namespace].properties = Object.assign(this.namespaces[namespace.namespace].properties, namespace.properties);
                 if (namespace.functions) this.namespaces[namespace.namespace].functions = this.namespaces[namespace.namespace].functions.concat(namespace.functions);
                 if (namespace.events) this.namespaces[namespace.namespace].events = this.namespaces[namespace.namespace].events.concat(namespace.events);
+                if (namespace.description) this.namespaces[namespace.namespace].description = namespace.description;
+                if (namespace.permissions) this.namespaces[namespace.namespace].permissions = this.namespaces[namespace.namespace].permissions.concat(namespace.permissions);
+                if (namespace.allowedContexts) this.namespaces[namespace.namespace].allowedContexts = this.namespaces[namespace.namespace].allowedContexts.concat(namespace.allowedContexts);
 
                 if (namespace['$import']) this.namespaces[namespace.namespace]['$import'] = namespace['$import']
             }
@@ -58,12 +164,11 @@ class Converter {
     }
 
     setUnsupportedAsOptional() {
-        this.namespaces = deepMapKeys(this.namespaces, (key) => {
-            if (key === 'unsupported') {
-                return 'optional';
+        for (let type of deepIteratePlainObjects(this.namespaces)) {
+            if (type.unsupported) {
+                type.optional = true;
             }
-            return key;
-        })
+        }
     }
 
     convert() {
@@ -120,7 +225,7 @@ class Converter {
                 // Make sure it has a proper id by adding parent id to id
                 propertyType.id = type.id + (name === 'properties' ? '' : ('_' + name));
                 // Output property type (adding a ? if optional)
-                convertedProperties.push(`${name}${type.properties[name].optional ? '?' : ''}: ${this.convertType(propertyType)}`);
+                convertedProperties.push(`${commentFromSchema(propertyType)}${name}${type.properties[name].optional ? '?' : ''}: ${this.convertType(propertyType)}`);
             }
         }
         // For each pattern property
@@ -213,11 +318,11 @@ class Converter {
             if (root) {
                 // So if we are in the root
                 // Add each enum value, sanitizing the name (if it has one, otherwise just using its value as name)
-                out += `{\n${type.enum.map(x => `${(x.name ? x.name : x).replace(/\W/g, '')} = "${x.name ? x.name : x}"`).join(',\n')}\n}`
+                out += `{\n${type.enum.map(x => `${commentFromSchema(x)}${(x.name ? x.name : x).replace(/\W/g, '')} = "${x.name ? x.name : x}"`).join(',\n')}\n}`
             } else {
                 // If we're not in the root, add the enum as an additional type instead, adding an _ in front of the name
                 // We convert the actual enum based on rules above by passing through the whole type code again, but this time as root
-                this.additionalTypes.push(`enum _${this.convertName(type.id)} ${this.convertType(type, true)}`);
+                this.additionalTypes.push(`${commentFromSchema(type)}enum _${this.convertName(type.id)} ${this.convertType(type, true)}`);
                 // And then just reference it by name in output
                 out += '_' + this.convertName(type.id);
             }
@@ -340,16 +445,18 @@ class Converter {
             if (convertedType === undefined) continue;
             // If we get its id in return, it's being weird and should just not be typechecked
             if (convertedType === type.id) convertedType = 'any';
+            // Get the comment
+            let comment = commentFromSchema(type);
             // Add converted source with proper keyword in front
             // This is here instead of in convertType, since that is also used for non root purposes
             if ((type.functions || type.events) || (type.type === 'object' && !type.isInstanceOf)) {
                 // If it has functions or events, or is an object that's not an instance of another one, it's an interface
-                convertedTypes.push(`interface ${type.id} ${convertedType}`);
+                convertedTypes.push(`${comment}interface ${type.id} ${convertedType}`);
             } else if (type.enum) {
-                convertedTypes.push(`enum ${this.convertName(type.id)} ${convertedType}`);
+                convertedTypes.push(`${comment}enum ${this.convertName(type.id)} ${convertedType}`);
             } else {
                 // It's just a type of some kind
-                convertedTypes.push(`type ${type.id} = ${convertedType};`);
+                convertedTypes.push(`${comment}type ${type.id} = ${convertedType};`);
             }
         }
         return convertedTypes
@@ -360,7 +467,7 @@ class Converter {
         let convertedProperties = [];
         // For each property, just add it as a const, appending | undefined if it's optional
         for (let prop of Object.keys(properties)) {
-            convertedProperties.push(`const ${prop}: ${this.convertType(properties[prop])}${properties[prop].optional ? ' | undefined' : ''};`);
+            convertedProperties.push(`${commentFromSchema(properties[prop])}const ${prop}: ${this.convertType(properties[prop])}${properties[prop].optional ? ' | undefined' : ''};`);
         }
         return convertedProperties;
     }
@@ -395,16 +502,17 @@ class Converter {
                 this.additionalTypes.push(`export {_${name} as ${name}};`);
                 name = '_' + name;
             }
-            if (optional) {
-                return `const ${name}: ((${parameters.join(', ')}) => ${returnType}) | undefined;`
-            } else {
-                return `function ${name}(${parameters.join(', ')}): ${returnType};`;
-            }
+            // Optional top-level functions aren't supported, because commenting parameters doesn't work for them
+            return `function ${name}(${parameters.join(', ')}): ${returnType};`;
         }
     }
 
     convertFunction(func, arrow = false, classy = false) {
         let out = '';
+        // Only comment proper functions and methods where the comment can apply
+        if (!arrow || classy) {
+            out += commentFromSchema(func);
+        }
         // Assume it returns void until proven otherwise
         let returnType = 'void';
         // Prove otherwise? either a normal returns or as an async promise
@@ -519,6 +627,9 @@ class Converter {
         // Add const and ; if we're not in a class
         out = `${!classy ? 'const ' : ''}${event.name}: ${this.convertSingleEvent(parameters, returnType, extra, event.name)}${out}${!classy && event.optional ? ' | undefined' : ''}${!classy ? ';' : ''}`;
 
+        // Comment it
+        out = commentFromSchema(event) + out;
+
         return out;
     }
 
@@ -537,8 +648,9 @@ class Converter {
         let out = '';
 
         if (data['$import']) {
+            let skipKeys = ['namespace', 'description', 'permissions'];
             _.mergeWith(data, this.namespaces[data['$import']], (objValue, srcValue, key) => {
-                if (key === 'namespace') return objValue;
+                if (skipKeys.includes(key)) return objValue;
                 if (_.isArray(objValue)) {
                     return _.uniqWith(objValue.concat(srcValue), (arrVal, othVal) => {
                         return (arrVal.id !== undefined && arrVal.id === othVal.id) || (arrVal.name !== undefined && arrVal.name === othVal.name);
@@ -559,6 +671,39 @@ class Converter {
         this.additionalTypes = _.uniqWith(this.additionalTypes, _.isEqual);
 
         // Output everything if needed
+
+        // Comment the description and permissions/manifest keys
+        let doclines = [];
+        if (data.description) {
+            doclines.push(descToMarkdown(data.description));
+        }
+        if (data.permissions && data.permissions.length > 0) {
+            // Manifest keys are in the permissions array, but start with "manifest:"
+            let permissions = [];
+            let manifestKeys = [];
+            for (let perm of data.permissions) {
+                if (/^manifest:(.*)/.exec(perm)) {
+                    manifestKeys.push(RegExp.$1);
+                } else {
+                    permissions.push(perm);
+                }
+            }
+            if (permissions.length > 0) {
+                doclines.push(`Permissions: ${permissions.map(p => `\`${p}\``).join(', ')}`);
+            }
+            if (manifestKeys.length > 0) {
+                doclines.push(`Manifest keys: ${manifestKeys.map(p => `\`${p}\``).join(', ')}`);
+            }
+        }
+        // Allowed contexts
+        let contexts = formatContexts(data.allowedContexts, true);
+        if (contexts) {
+            doclines.push(contexts);
+        }
+        if (doclines.length > 0) {
+            out += toDocComment(doclines.join('\n\n')) + '\n';
+        }
+
         out += `declare namespace browser.${data.namespace} {\n`;
         if (this.types.length > 0) out += `/* ${data.namespace} types */\n${this.types.join('\n\n')}\n\n`;
         if (this.additionalTypes.length > 0) out += `${this.additionalTypes.join('\n\n')}\n\n`;
