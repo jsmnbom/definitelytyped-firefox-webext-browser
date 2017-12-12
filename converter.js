@@ -561,7 +561,7 @@ class Converter {
         // The rest of the parameters
         let rest = [];
         for (let [i, param] of (func.parameters || []).entries()) {
-            if (isLeadingOptional(parameters, i)) {
+            if (isLeadingOptional(func.parameters, i)) {
                 // It won't be optional in the overload signature, so create a copy of it marked as non-optional
                 leadingOptionals.push({...param, optional: false});
             } else {
