@@ -42,7 +42,7 @@ function formatContexts(contexts, outputAlways = false) {
     // Check if this thing is only allowed in one context
     for (let context of contexts) {
         if (/^(.*)_only$/.exec(context) && CTX_CMT_ONLY_ALLOWED_IN.includes(RegExp.$1)) {
-            return `Contexts: ${CONTEXT_NAMES[RegExp.$1]} only`;
+            return `Allowed in: ${CONTEXT_NAMES[RegExp.$1]} only`;
         }
     }
     let lines = [];
