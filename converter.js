@@ -490,11 +490,11 @@ class Converter {
         return convertedParameters;
     }
 
-    convertSingleFunction(name, parameters, returnType, arrow, classy, optional) {
+    convertSingleFunction(name, parameters, returnType, arrow, classy, func) {
         // function x() {} or () => {}?
         if (arrow) {
             // Okay () => {}, unless we want it classy (inside a class) in which case use name(): {}
-            return `${classy ? `${name}${optional ? '?' : ''}` : ''}(${parameters.join(', ')})${classy ? ':' : ' =>'} ${returnType}`;
+            return `${classy ? `${commentFromSchema(func)}${name}${func.optional ? '?' : ''}` : ''}(${parameters.join(', ')})${classy ? ':' : ' =>'} ${returnType}`;
         } else {
             // If the name is a reversed keyword
             if (RESERVED.includes(name)) {
@@ -503,16 +503,12 @@ class Converter {
                 name = '_' + name;
             }
             // Optional top-level functions aren't supported, because commenting parameters doesn't work for them
-            return `function ${name}(${parameters.join(', ')}): ${returnType};`;
+            return `${commentFromSchema(func)}function ${name}(${parameters.join(', ')}): ${returnType};`;
         }
     }
 
     convertFunction(func, arrow = false, classy = false) {
         let out = '';
-        // Only comment proper functions and methods where the comment can apply
-        if (!arrow || classy) {
-            out += commentFromSchema(func);
-        }
         // Assume it returns void until proven otherwise
         let returnType = 'void';
         // Prove otherwise? either a normal returns or as an async promise
@@ -549,7 +545,7 @@ class Converter {
         // So we get an function that's '(one, two) | (two)' instead of '(one?, two)'
         for (let i = 0; i < parameters.length; i++) {
             if (parameters[i].includes('?') && parameters.length > i + 1) {
-                out += this.convertSingleFunction(func.name, parameters.slice(i + 1), returnType, arrow, classy, func.optional) + (classy ? ';\n' : '\n');
+                out += this.convertSingleFunction(func.name, parameters.slice(i + 1), returnType, arrow, classy, func) + (classy ? ';\n' : '\n');
             } else {
                 break;
             }
@@ -561,7 +557,7 @@ class Converter {
             return x;
         });
 
-        out += this.convertSingleFunction(func.name, parameters, returnType, arrow, classy, func.optional);
+        out += this.convertSingleFunction(func.name, parameters, returnType, arrow, classy, func);
 
         return out;
     }
