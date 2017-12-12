@@ -11,6 +11,7 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 
 // Types that are considered "simple"
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
+const ALREADY_OPTIONAL_RETURNS = ['any', 'undefined', 'void'];
 
 // Readable names for "allowedContexts" values from the schema
 const CONTEXT_NAMES = {
@@ -269,12 +270,16 @@ class Converter {
     }
 
     // noinspection JSMethodCanBeStatic
-    convertEnumName(name) {
+    convertName(name) {
         // Convert from snake_case to PascalCase
         return name.split('_').map(x => x.charAt(0).toUpperCase() + x.slice(1)).join('');
     }
 
     convertType(type, root = false) {
+        // Check if we've overridden it, likely for a type that can't be represented in json schema
+        if (type.converterTypeOverride) {
+            return type.converterTypeOverride;
+        }
         let out = '';
         // Check type of type
         if (type.choices) {
@@ -317,9 +322,9 @@ class Converter {
             } else {
                 // If we're not in the root, add the enum as an additional type instead, adding an _ in front of the name
                 // We convert the actual enum based on rules above by passing through the whole type code again, but this time as root
-                this.additionalTypes.push(`${commentFromSchema(type)}enum _${this.convertEnumName(type.id)} ${this.convertType(type, true)}`);
+                this.additionalTypes.push(`${commentFromSchema(type)}enum _${this.convertName(type.id)} ${this.convertType(type, true)}`);
                 // And then just reference it by name in output
-                out += '_' + this.convertEnumName(type.id);
+                out += '_' + this.convertName(type.id);
             }
         } else if (type.type) {
             // The type has an actual type, check it
@@ -448,7 +453,7 @@ class Converter {
                 // If it has functions or events, or is an object that's not an instance of another one, it's an interface
                 convertedTypes.push(`${comment}interface ${type.id} ${convertedType}`);
             } else if (type.enum) {
-                convertedTypes.push(`${comment}enum ${this.convertEnumName(type.id)} ${convertedType}`);
+                convertedTypes.push(`${comment}enum ${this.convertName(type.id)} ${convertedType}`);
             } else {
                 // It's just a type of some kind
                 convertedTypes.push(`${comment}type ${type.id} = ${convertedType};`);
@@ -513,9 +518,11 @@ class Converter {
         // Prove otherwise? either a normal returns or as an async promise
         if (func.returns) {
             returnType = this.convertType(func.returns);
+            if (func.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
         } else if (func.async === 'callback') {
             // If it's async then find the callback function and convert it to a promise
-            let parameters = this.convertParameters(func.parameters.find(x => x.type === 'function' && x.name === 'callback').parameters, false, func.name);
+            let callback = func.parameters.find(x => x.type === 'function' && x.name === 'callback');
+            let parameters = this.convertParameters(callback.parameters, false, func.name);
             if (parameters.length > 1) {
                 // Since these files are originally chrome, some things are a bit weird
                 // Callbacks (which is what chrome uses) have no issues with returning multiple values
@@ -530,7 +537,9 @@ class Converter {
             }
             // Use void as return type if there were no parameters
             // Note that the join is kinda useless (see long comments above)
-            returnType = `Promise<${parameters.join(', ') || 'void'}>`
+            let promiseReturn = parameters[0] || 'void';
+            if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
+            returnType = `Promise<${promiseReturn}>`
         }
 
         // Get parameters
@@ -567,9 +576,16 @@ class Converter {
     }
 
     // noinspection JSMethodCanBeStatic
-    convertSingleEvent(parameters, returnType) {
-        // Use the helper that we define in HEADER
-        return `WebExtEventListener<(${parameters.join(', ')}) => ${returnType}>`;
+    convertSingleEvent(parameters, returnType, extra, name) {
+        if (extra) {
+            // It has extra parameters, so output custom event handler
+            let listenerName = '_' + this.convertName(`${this.namespace}_${name}_Event`);
+            this.additionalTypes.push(`type ${listenerName}<T = (${parameters.join(', ')}) => void> = WebExtEventBase<(callback: T, ${extra.join(', ')}) => void, T>;`);
+            return `${listenerName}`;
+        } else {
+            // It has no extra parameters, so just use the helper that we define in HEADER
+            return `WebExtEvent<(${parameters.join(', ')}) => ${returnType}>`;
+        }
     }
 
     convertEvent(event, classy = false) {
@@ -579,6 +595,14 @@ class Converter {
         // Prove otherwise?
         if (event.returns) {
             returnType = this.convertType(event.returns);
+            if (event.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
+        }
+
+        // Check if we have extra parameters (for the addListener() call)
+        let extra;
+        if (event.extraParameters) {
+            // If we do, get them
+            extra = this.convertParameters(event.extraParameters, true);
         }
 
         // Get parameters
@@ -588,7 +612,7 @@ class Converter {
         // So we get an event that's '(one, two) | (two)' instead of '(one?, two)'
         for (let i = 0; i < parameters.length; i++) {
             if (parameters[i].includes('?') && parameters.length > i + 1) {
-                out += '\n| ' + this.convertSingleEvent(parameters.slice(i + 1), returnType, classy);
+                out += '\n| ' + this.convertSingleEvent(parameters.slice(i + 1), returnType, extra, event.name);
             } else {
                 break;
             }
@@ -601,7 +625,7 @@ class Converter {
         });
 
         // Add const and ; if we're not in a class
-        out = `${!classy ? 'const ' : ''}${event.name}: ${this.convertSingleEvent(parameters, returnType, classy)}${out}${!classy && event.optional ? ' | undefined' : ''}${!classy ? ';' : ''}`;
+        out = `${!classy ? 'const ' : ''}${event.name}: ${this.convertSingleEvent(parameters, returnType, extra, event.name)}${out}${!classy && event.optional ? ' | undefined' : ''}${!classy ? ';' : ''}`;
 
         // Comment it
         out = commentFromSchema(event) + out;
