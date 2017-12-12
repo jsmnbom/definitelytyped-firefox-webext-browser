@@ -537,35 +537,13 @@ class Converter {
                 // Note that the join is kinda useless (see long comments above)
                 let promiseReturn = parameters[0] || 'void';
                 if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
-                returnType = `Promise<${promiseReturn}>`
+                returnType = `Promise<${promiseReturn}>`;
                 // Because of namespace extends(?), a few functions can pass through here twice,
                 // so override the return type since the callback was removed and it can't be converted again
                 func.returns = {converterTypeOverride: returnType};
                 // Converted now
                 delete func.async;
             }
-        }
-            let callbackIndex = func.parameters.findIndex(x => x.type === 'function' && x.name === 'callback');
-            // Delete the callback parameter
-            let callback = func.parameters.splice(callbackIndex, 1)[0];
-            let parameters = this.convertParameters(callback.parameters, false, func.name);
-            if (parameters.length > 1) {
-                // Since these files are originally chrome, some things are a bit weird
-                // Callbacks (which is what chrome uses) have no issues with returning multiple values
-                // but firefox uses promises, which AFAIK can't handle that
-                // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in question yet
-                // But since it's in the schemas, it's still a problem for us
-                // TODO: Follow firefox developments in this area
-                console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
-                // Just assume it's gonna be some kind of object that's returned from the promise
-                // This seems like the most likely way the firefox team is going to make the promise return multiple values
-                parameters = ['object']
-            }
-            // Use void as return type if there were no parameters
-            // Note that the join is kinda useless (see long comments above)
-            let promiseReturn = parameters[0] || 'void';
-            if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
-            returnType = `Promise<${promiseReturn}>`
         }
 
         // Create overload signatures for leading optional parameters
