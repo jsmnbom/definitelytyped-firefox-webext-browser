@@ -509,37 +509,43 @@ class Converter {
 
     convertFunction(func, arrow = false, classy = false) {
         let out = '';
-        // Only comment proper functions and methods where the comment can apply
-        if (!arrow || classy) {
-            out += commentFromSchema(func);
-        }
         // Assume it returns void until proven otherwise
         let returnType = 'void';
         // Prove otherwise? either a normal returns or as an async promise
         if (func.returns) {
             returnType = this.convertType(func.returns);
             if (func.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
-        } else if (func.async === 'callback') {
+        } else if (func.async) {
             // If it's async then find the callback function and convert it to a promise
-            let callback = func.parameters.find(x => x.type === 'function' && x.name === 'callback');
-            let parameters = this.convertParameters(callback.parameters, false, func.name);
-            if (parameters.length > 1) {
-                // Since these files are originally chrome, some things are a bit weird
-                // Callbacks (which is what chrome uses) have no issues with returning multiple values
-                // but firefox uses promises, which AFAIK can't handle that
-                // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in question yet
-                // But since it's in the schemas, it's still a problem for us
-                // TODO: Follow firefox developments in this area
-                console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
-                // Just assume it's gonna be some kind of object that's returned from the promise
-                // This seems like the most likely way the firefox team is going to make the promise return multiple values
-                parameters = ['object']
+            let callback = func.parameters.find(x => x.type === 'function' && x.name === func.async);
+            if (callback) {
+                // Remove callback from parameters as we're gonna handle it as a promise return
+                func.parameters = func.parameters.filter(x => x !== callback);
+                let parameters = this.convertParameters(callback.parameters, false, func.name);
+                if (parameters.length > 1) {
+                    // Since these files are originally chrome, some things are a bit weird
+                    // Callbacks (which is what chrome uses) have no issues with returning multiple values
+                    // but firefox uses promises, which AFAIK can't handle that
+                    // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in question yet
+                    // But since it's in the schemas, it's still a problem for us
+                    // TODO: Follow firefox developments in this area
+                    console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
+                    // Just assume it's gonna be some kind of object that's returned from the promise
+                    // This seems like the most likely way the firefox team is going to make the promise return multiple values
+                    parameters = ['object']
+                }
+                // Use void as return type if there were no parameters
+                // Note that the join is kinda useless (see long comments above)
+                let promiseReturn = parameters[0] || 'void';
+                if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
+                returnType = `Promise<${promiseReturn}>`
             }
-            // Use void as return type if there were no parameters
-            // Note that the join is kinda useless (see long comments above)
-            let promiseReturn = parameters[0] || 'void';
-            if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
-            returnType = `Promise<${promiseReturn}>`
+        }
+
+        // Only comment proper functions and methods where the comment can apply
+        // This is after the returnType stuff as that code sometimes altars func.parameters
+        if (!arrow || classy) {
+            out += commentFromSchema(func);
         }
 
         // Get parameters
