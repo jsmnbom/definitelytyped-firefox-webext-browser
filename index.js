@@ -27,11 +27,13 @@ const HEADER = `// Type definitions for WebExtension Development in FireFox ${ar
 // TypeScript Version: 2.4
 // Generated using script at github.com/bomjacob/definitelytyped-firefox-webext-browser
 
-interface WebExtEventListener<T extends (...args: any[]) => any> {
-    addListener: (callback: T) => void;
-    removeListener: (listener: T) => void;
-    hasListener: (listener: T) => boolean;
+interface WebExtEventBase<TAddListener extends (...args: any[]) => any, TCallback> {
+    addListener: TAddListener;
+    removeListener(cb: TCallback): void;
+    hasListener(cb: TCallback): boolean;
 }
+
+type WebExtEvent<TCallback extends (...args: any[]) => any> = WebExtEventBase<(callback: TCallback) => void, TCallback>;
 
 interface Window {
     browser: typeof browser;
