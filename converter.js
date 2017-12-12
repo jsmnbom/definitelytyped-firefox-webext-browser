@@ -12,15 +12,51 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
 // Types that are considered "simple"
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
 
+// Readable names for "allowedContexts" values from the schema
+const CONTEXT_NAMES = {
+    'addon_parent': 'Add-on parent',
+    'content':      'Content scripts',
+    'devtools':     'Devtools pages',
+    'proxy':        'Proxy scripts',
+};
+
+// Comment "X context only" for these contexts
+const CTX_CMT_ONLY_ALLOWED_IN = ['content', 'devtools', 'proxy'];
+
+// Comment "Not allowed in" for these contexts
+const CTX_CMT_NOT_ALLOWED_IN = ['content', 'devtools'];
+
+// Comment "Allowed in" for these contexts
+const CTX_CMT_ALLOWED_IN = ['proxy'];
+
 // Formats an allowedContexts array to a readable string
-function formatContexts(contexts) {
+function formatContexts(contexts, outputAlways = false) {
     if (!contexts || contexts.length === 0) {
-        return '';
+        if (outputAlways) {
+            // No contexts are specified, but we can likely still output something
+            contexts = [];
+        } else {
+            return '';
+        }
     }
-    if (contexts.includes('devtools_only')) {
-        return 'Devtools pages only';
+    // Check if this thing is only allowed in one context
+    for (let context of contexts) {
+        if (/^(.*)_only$/.exec(context) && CTX_CMT_ONLY_ALLOWED_IN.includes(RegExp.$1)) {
+            return `Contexts: ${CONTEXT_NAMES[RegExp.$1]} only`;
+        }
     }
-    return '';
+    let lines = [];
+    // If a context from CTX_CMT_NOT_ALLOWED_IN isn't in contexts, comment it as "not allowed in"
+    let notAllowedIn = CTX_CMT_NOT_ALLOWED_IN.filter(context => !contexts.includes(context));
+    if (notAllowedIn.length > 0) {
+        lines.push(`Not allowed in: ${notAllowedIn.map(ctx => CONTEXT_NAMES[ctx]).join(', ')}`);
+    }
+    // If a context from CTX_CMT_ALLOWED_IN is in contexts, comment it as "allowed in"
+    let allowedIn = CTX_CMT_ALLOWED_IN.filter(context => contexts.includes(context));
+    if (allowedIn.length > 0) {
+        lines.push(`Allowed in: ${allowedIn.map(ctx => CONTEXT_NAMES[ctx]).join(', ')}`);
+    }
+    return (lines.length > 0) ? lines.join('\n\n') : '';
 }
 
 // Creates a doc comment out of a schema object
@@ -33,7 +69,7 @@ function commentFromSchema(schema) {
     if (contexts) {
         // Separate with an empty line
         if (doclines.length > 0) doclines.push('');
-        doclines.push(`Contexts: ${contexts}`);
+        doclines.push(contexts);
     }
     if (schema.parameters) {
         for (let param of schema.parameters) {
@@ -636,9 +672,9 @@ class Converter {
             }
         }
         // Allowed contexts
-        let contexts = formatContexts(data.allowedContexts);
+        let contexts = formatContexts(data.allowedContexts, true);
         if (contexts) {
-            doclines.push(`Contexts: ${contexts}`);
+            doclines.push(contexts);
         }
         if (doclines.length > 0) {
             out += toDocComment(doclines.join('\n\n')) + '\n';
