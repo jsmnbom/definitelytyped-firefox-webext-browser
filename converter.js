@@ -490,7 +490,8 @@ class Converter {
         return convertedParameters;
     }
 
-    convertSingleFunction(name, parameters, returnType, arrow, classy, func) {
+    convertSingleFunction(name, returnType, arrow, classy, func) {
+        let parameters = this.convertParameters(func.parameters, true, func.name);
         // function x() {} or () => {}?
         if (arrow) {
             // Okay () => {}, unless we want it classy (inside a class) in which case use name(): {}
@@ -517,7 +518,9 @@ class Converter {
             if (func.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
         } else if (func.async === 'callback') {
             // If it's async then find the callback function and convert it to a promise
-            let callback = func.parameters.find(x => x.type === 'function' && x.name === 'callback');
+            let callbackIndex = func.parameters.findIndex(x => x.type === 'function' && x.name === 'callback');
+            // Delete the callback parameter
+            let callback = func.parameters.splice(callbackIndex, 1)[0];
             let parameters = this.convertParameters(callback.parameters, false, func.name);
             if (parameters.length > 1) {
                 // Since these files are originally chrome, some things are a bit weird
@@ -536,28 +539,49 @@ class Converter {
             let promiseReturn = parameters[0] || 'void';
             if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
             returnType = `Promise<${promiseReturn}>`
+            // Because of namespace extends(?), a few functions can pass through here twice,
+            // so override the return type since the callback was removed and it can't be converted again
+            func.returns = {converterTypeOverride: returnType};
+            // Converted now
+            delete func.async;
         }
 
-        // Get parameters
-        let parameters = this.convertParameters(func.parameters, true, func.name);
+        // Create overload signatures for leading optional parameters
         // Typescript can't handle when e.g. parameter 1 is optional, but parameter 2 isn't
         // Therefore output multiple function choices where we one by one, strip the optional status
-        // So we get an function that's '(one, two) | (two)' instead of '(one?, two)'
-        for (let i = 0; i < parameters.length; i++) {
-            if (parameters[i].includes('?') && parameters.length > i + 1) {
-                out += this.convertSingleFunction(func.name, parameters.slice(i + 1), returnType, arrow, classy, func) + (classy ? ';\n' : '\n');
+
+        // Check if "parameters[index]" is optional with at least one required parameter following it
+        let isLeadingOptional = (parameters, index) => {
+            let firstRequiredIndex = parameters.findIndex(x => !x.optional);
+            return firstRequiredIndex > index;
+        };
+
+        // Optional parameters with at least one required parameter following them, marked as non-optional
+        let leadingOptionals = [];
+        // The rest of the parameters
+        let rest = [];
+        for (let [i, param] of (func.parameters || []).entries()) {
+            if (isLeadingOptional(parameters, i)) {
+                // It won't be optional in the overload signature, so create a copy of it marked as non-optional
+                leadingOptionals.push({...param, optional: false});
             } else {
-                break;
+                rest.push(param);
             }
         }
-        parameters = parameters.map((x, i) => {
-            if (parameters.length > 0 && i < parameters.length - 1) {
-                return x.replace('?', '');
-            }
-            return x;
-        });
 
-        out += this.convertSingleFunction(func.name, parameters, returnType, arrow, classy, func);
+        // Output the normal signature
+        out += this.convertSingleFunction(func.name, returnType, arrow, classy, {
+            ...func,
+            parameters: rest,
+        });
+        // Output signatures for any leading optional parameters
+        for (let i = 0; i < leadingOptionals.length; i++) {
+            let funcWithParams = {
+                ...func,
+                parameters: leadingOptionals.slice(i).concat(rest),
+            };
+            out += "\n" + this.convertSingleFunction(func.name, returnType, arrow, classy, funcWithParams) + (classy ? ';\n' : '');
+        }
 
         return out;
     }
