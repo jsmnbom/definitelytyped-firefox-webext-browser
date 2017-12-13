@@ -74,6 +74,8 @@ function commentFromSchema(schema) {
     }
     if (schema.parameters) {
         for (let param of schema.parameters) {
+            // '@param' is redundant in TypeScript code if it has no description.
+            if (!param.description) continue;
             // Callbacks are skipped in other parts of the code as well
             if (param.type === 'function' && param.name === 'callback') continue;
             // Square brackets around optional parameter names is a jsdoc convention
