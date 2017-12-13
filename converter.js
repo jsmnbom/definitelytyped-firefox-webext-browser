@@ -542,6 +542,9 @@ class Converter {
                 func.returns = {converterTypeOverride: returnType};
                 // Converted now
                 delete func.async;
+            } else {
+                // Since it's async it's gotta return a promise... the type just isn't specified in the schemas
+                returnType = 'Promise<any>';
             }
         }
 
