@@ -89,7 +89,7 @@ for (let path of [
     // Return type of the callback is weirder than the schemas can express
     x.returns.converterTypeOverride = 'BlockingResponse | Promise<BlockingResponse>';
     // It's also optional, since you can choose to just listen to the event
-    x.returns.options = true;
+    x.returns.optional = true;
     return x;
 });
 

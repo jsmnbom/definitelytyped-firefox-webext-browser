@@ -475,8 +475,6 @@ class Converter {
         let convertedParameters = [];
         // For each parameter
         for (let parameter of Object.keys(parameters)) {
-            // If it's a function and that function is 'callback' we skip it since we don't use callbacks but promises instead
-            if (parameters[parameter].type && parameters[parameter].name && parameters[parameter].type === 'function' && parameters[parameter].name === 'callback') continue;
             let out = '';
             // If includeName then include the name (add ? if optional)
             if (includeName) out += `${parameters[parameter].name ? parameters[parameter].name : parameter}${parameters[parameter].optional ? '?' : ''}: `;
@@ -515,6 +513,7 @@ class Converter {
             returnType = this.convertType(func.returns);
             if (func.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
         } else if (func.async) {
+            if (func.async === true) func.async = 'callback';
             // If it's async then find the callback function and convert it to a promise
             let callback = func.parameters.find(x => x.type === 'function' && x.name === func.async);
             if (callback) {
