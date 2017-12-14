@@ -106,28 +106,75 @@ for (let path of [
     return x;
 });
 // Fix the lack of promise return in functions that firefox has but chrome doesn't
-for (let func of [
-    ['sessions', 'functions', 'setTabValue', 'Promise<void>'],
-    ['sessions', 'functions', 'getTabValue', 'Promise<string | object | undefined>'],
-    ['sessions', 'functions', 'removeTabValue', 'Promise<void>'],
-    ['sessions', 'functions', 'setWindowValue', 'Promise<void>'],
-    ['sessions', 'functions', 'getWindowValue', 'Promise<string | object | undefined>'],
-    ['sessions', 'functions', 'removeWindowValue', 'Promise<void>'],
-    ['sessions', 'functions', 'forgetClosedTab', 'Promise<void>'],
-    ['sessions', 'functions', 'forgetClosedWindow', 'Promise<void>'],
-    ['sessions', 'functions', 'getRecentlyClosed', 'Promise<Session[]>'],
-    ['sessions', 'functions', 'restore', 'Promise<Session>'],
-    ['sidebarAction', 'functions', 'close', 'Promise<void>'],
-    ['sidebarAction', 'functions', 'open', 'Promise<void>'],
-    ['sidebarAction', 'functions', 'setPanel', 'Promise<void>'],
-    ['sidebarAction', 'functions', 'setIcon', 'Promise<void>'],
-    ['sidebarAction', 'functions', 'setTitle', 'Promise<void>'],
-    ['sidebarAction', 'functions', 'getPanel', 'Promise<string>'],
-    ['sidebarAction', 'functions', 'getTitle', 'Promise<string>'],
-]) converter.edit(func[0], func[1], func[2], x => {
-    x.returns = {converterTypeOverride: func[3]};
-    return x;
-});
+for (let [namespace, funcs] of [
+    ['clipboard', [['setImageData', 'void']]],
+    ['contextualIdentities', [
+        ['create', 'ContextualIdentity'],
+        ['get', 'ContextualIdentity'],
+        ['query', 'ContextualIdentity[]'],
+        ['remove', 'ContextualIdentity'],
+        ['update', 'ContextualIdentity']
+    ]],
+    ['proxy', [
+        ['register', 'void'],
+        ['unregister', 'void']
+    ]],
+    ['theme', [
+        ['getCurrent', '_manifest.ThemeType'],
+        ['reset', false],
+        ['update', false]
+    ]],
+    ['browserAction', [['openPopup', 'void']]],
+    ['find', [
+        ['find', '{\ncount: number;\nrangeData?: Array<{\nframePos: number;\nstartTextNodePos: number;\nendTextNodePos: number;\nstartOffset: number;\nendOffset: number;\n}>;\nrectData?: Array<{\nrectsAndTexts: {\nrectList: Array<{\ntop: number;\nleft: number;\nbottom: number;\nright: number;\n}>;\ntextList: string[];\n};\ntextList: string;\n}>;\n}'],
+        ['highlightResults', false],
+        ['removeHighlighting', false]
+    ]],
+    ['pageAction', [
+        ['setPopup', false],
+        ['openPopup', 'void']
+    ]],
+    ['pkcs11', [
+        ['getModuleSlots', '{\nname: string;\ntoken?: {\nname: string;\nmanufacturer: string;\nHWVersion: string;\nFWVersion: string;\nserial: string;\nisLoggedIn: string;\n};\n}'],
+        ['installModule', 'void'],
+        ['isModuleInstalled', 'boolean'],
+        ['uninstallModule', 'void']
+    ]],
+    ['sessions', [
+        ['setTabValue', 'void'],
+        ['getTabValue', 'string | object | undefined'],
+        ['removeTabValue', 'void'],
+        ['setWindowValue', 'void'],
+        ['getWindowValue', 'string | object | undefined'],
+        ['removeWindowValue', 'void'],
+        ['forgetClosedTab', 'void'],
+        ['forgetClosedWindow', 'void'],
+        ['getRecentlyClosed', 'Session[]'],
+        ['restore', 'Session']
+    ]],
+    ['sidebarAction', [
+        ['close', 'void'],
+        ['open', 'void'],
+        ['setPanel', 'void'],
+        ['setIcon', 'void'],
+        ['setTitle', 'void'],
+        ['getPanel', 'string'],
+        ['getTitle', 'string']
+    ]],
+    ['tabs', [
+        ['discard', 'void'],
+        ['toggleReaderMode', 'void']
+    ]]
+]) {
+    for (let [name, ret] of funcs) converter.edit(namespace, 'functions', name, x => {
+        if (ret) {
+            x.returns = {converterTypeOverride: `Promise<${ret}>`};
+        } else {
+            x.returns = {converterTypeOverride: 'void'};
+        }
+        return x;
+    });
+}
 // Prevent some of Event from being promisified
 converter.edit('events', 'types', 'Event', x => {
     for (let f of x.functions.slice(0,3)) {
