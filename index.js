@@ -92,6 +92,43 @@ for (let path of [
     x.returns.optional = true;
     return x;
 });
+// Fix webrequest events
+for (let path of [
+    ['webRequest', 'events', 'onAuthRequired'],
+    ['webRequest', 'events', 'onBeforeRequest'],
+    ['webRequest', 'events', 'onBeforeSendHeaders'],
+    ['webRequest', 'events', 'onHeadersReceived'],
+]) converter.edit(...path, x => {
+    // Return type of the callback is weirder than the schemas can express
+    x.returns.converterTypeOverride = 'BlockingResponse | Promise<BlockingResponse>';
+    // It's also optional, since you can choose to just listen to the event
+    x.returns.optional = true;
+    return x;
+});
+// Fix the lack of promise return in functions that firefox has but chrome doesn't
+for (let func of [
+    ['sessions', 'functions', 'setTabValue', 'Promise<void>'],
+    ['sessions', 'functions', 'getTabValue', 'Promise<string | object | undefined>'],
+    ['sessions', 'functions', 'removeTabValue', 'Promise<void>'],
+    ['sessions', 'functions', 'setWindowValue', 'Promise<void>'],
+    ['sessions', 'functions', 'getWindowValue', 'Promise<string | object | undefined>'],
+    ['sessions', 'functions', 'removeWindowValue', 'Promise<void>'],
+    ['sessions', 'functions', 'forgetClosedTab', 'Promise<void>'],
+    ['sessions', 'functions', 'forgetClosedWindow', 'Promise<void>'],
+    ['sessions', 'functions', 'getRecentlyClosed', 'Promise<Session[]>'],
+    ['sessions', 'functions', 'restore', 'Promise<Session>'],
+    ['sidebarAction', 'functions', 'close', 'Promise<void>'],
+    ['sidebarAction', 'functions', 'open', 'Promise<void>'],
+    ['sidebarAction', 'functions', 'setPanel', 'Promise<void>'],
+    ['sidebarAction', 'functions', 'setIcon', 'Promise<void>'],
+    ['sidebarAction', 'functions', 'setTitle', 'Promise<void>'],
+    ['sidebarAction', 'functions', 'getPanel', 'Promise<string>'],
+    ['sidebarAction', 'functions', 'getTitle', 'Promise<string>'],
+    [... continued]
+]) converter.edit(func[0], func[1], func[2], y => {
+    y.returns = {converterTypeOverride: func[3]};
+    return y;
+});
 
 converter.convert();
 converter.write(argv['o']);
