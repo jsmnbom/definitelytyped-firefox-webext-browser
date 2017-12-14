@@ -124,11 +124,24 @@ for (let func of [
     ['sidebarAction', 'functions', 'setTitle', 'Promise<void>'],
     ['sidebarAction', 'functions', 'getPanel', 'Promise<string>'],
     ['sidebarAction', 'functions', 'getTitle', 'Promise<string>'],
-    [... continued]
-]) converter.edit(func[0], func[1], func[2], y => {
-    y.returns = {converterTypeOverride: func[3]};
-    return y;
+]) converter.edit(func[0], func[1], func[2], x => {
+    x.returns = {converterTypeOverride: func[3]};
+    return x;
 });
+// Prevent some of Event from being promisified
+converter.edit('events', 'types', 'Event', x => {
+    for (let f of x.functions.slice(0,3)) {
+        f.async = false;
+    }
+    console.log(x);
+    return x;
+});
+// This should prob also not return promise
+converter.edit('devtools.panels', 'types', 'ElementsPanel', x => {
+    x.functions[0].async = false;
+    return x;
+});
+
 
 converter.convert();
 converter.write(argv['o']);

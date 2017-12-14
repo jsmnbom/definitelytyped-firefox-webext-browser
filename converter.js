@@ -512,10 +512,10 @@ class Converter {
         if (func.returns) {
             returnType = this.convertType(func.returns);
             if (func.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
-        } else if (func.async) {
-            if (func.async === true) func.async = 'callback';
+        } else {
+            if (func.async === undefined) func.async = 'callback';
             // If it's async then find the callback function and convert it to a promise
-            let callback = func.parameters.find(x => x.type === 'function' && x.name === func.async);
+            let callback = func.parameters && func.parameters.find(x => x.type === 'function' && x.name === func.async);
             if (callback) {
                 // Remove callback from parameters as we're gonna handle it as a promise return
                 func.parameters = func.parameters.filter(x => x !== callback);
@@ -542,7 +542,7 @@ class Converter {
                 func.returns = {converterTypeOverride: returnType};
                 // Converted now
                 delete func.async;
-            } else {
+            } else if (func.async && func.async !== 'callback') {
                 // Since it's async it's gotta return a promise... the type just isn't specified in the schemas
                 returnType = 'Promise<any>';
             }
