@@ -74,8 +74,6 @@ function commentFromSchema(schema) {
     }
     if (schema.parameters) {
         for (let param of schema.parameters) {
-            // Callbacks are skipped in other parts of the code as well
-            if (param.type === 'function' && param.name === 'callback') continue;
             // Square brackets around optional parameter names is a jsdoc convention
             let name = (param.optional) ? `[${param.name}]` : param.name;
             let desc = (param.description) ? ' ' + descToMarkdown(param.description) : '';
@@ -477,8 +475,6 @@ class Converter {
         let convertedParameters = [];
         // For each parameter
         for (let parameter of Object.keys(parameters)) {
-            // If it's a function and that function is 'callback' we skip it since we don't use callbacks but promises instead
-            if (parameters[parameter].type && parameters[parameter].name && parameters[parameter].type === 'function' && parameters[parameter].name === 'callback') continue;
             let out = '';
             // If includeName then include the name (add ? if optional)
             if (includeName) out += `${parameters[parameter].name ? parameters[parameter].name : parameter}${parameters[parameter].optional ? '?' : ''}: `;
@@ -516,34 +512,40 @@ class Converter {
         if (func.returns) {
             returnType = this.convertType(func.returns);
             if (func.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
-        } else if (func.async === 'callback') {
+        } else {
+            if (func.async === undefined) func.async = 'callback';
             // If it's async then find the callback function and convert it to a promise
-            let callbackIndex = func.parameters.findIndex(x => x.type === 'function' && x.name === 'callback');
-            // Delete the callback parameter
-            let callback = func.parameters.splice(callbackIndex, 1)[0];
-            let parameters = this.convertParameters(callback.parameters, false, func.name);
-            if (parameters.length > 1) {
-                // Since these files are originally chrome, some things are a bit weird
-                // Callbacks (which is what chrome uses) have no issues with returning multiple values
-                // but firefox uses promises, which AFAIK can't handle that
-                // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in question yet
-                // But since it's in the schemas, it's still a problem for us
-                // TODO: Follow firefox developments in this area
-                console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
-                // Just assume it's gonna be some kind of object that's returned from the promise
-                // This seems like the most likely way the firefox team is going to make the promise return multiple values
-                parameters = ['object']
+            let callback = func.parameters && func.parameters.find(x => x.type === 'function' && x.name === func.async);
+            if (callback) {
+                // Remove callback from parameters as we're gonna handle it as a promise return
+                func.parameters = func.parameters.filter(x => x !== callback);
+                let parameters = this.convertParameters(callback.parameters, false, func.name);
+                if (parameters.length > 1) {
+                    // Since these files are originally chrome, some things are a bit weird
+                    // Callbacks (which is what chrome uses) have no issues with returning multiple values
+                    // but firefox uses promises, which AFAIK can't handle that
+                    // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in question yet
+                    // But since it's in the schemas, it's still a problem for us
+                    // TODO: Follow firefox developments in this area
+                    console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
+                    // Just assume it's gonna be some kind of object that's returned from the promise
+                    // This seems like the most likely way the firefox team is going to make the promise return multiple values
+                    parameters = ['object']
+                }
+                // Use void as return type if there were no parameters
+                // Note that the join is kinda useless (see long comments above)
+                let promiseReturn = parameters[0] || 'void';
+                if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
+                returnType = `Promise<${promiseReturn}>`;
+                // Because of namespace extends(?), a few functions can pass through here twice,
+                // so override the return type since the callback was removed and it can't be converted again
+                func.returns = {converterTypeOverride: returnType};
+                // Converted now
+                delete func.async;
+            } else if (func.async && func.async !== 'callback') {
+                // Since it's async it's gotta return a promise... the type just isn't specified in the schemas
+                returnType = 'Promise<any>';
             }
-            // Use void as return type if there were no parameters
-            // Note that the join is kinda useless (see long comments above)
-            let promiseReturn = parameters[0] || 'void';
-            if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | void';
-            returnType = `Promise<${promiseReturn}>`
-            // Because of namespace extends(?), a few functions can pass through here twice,
-            // so override the return type since the callback was removed and it can't be converted again
-            func.returns = {converterTypeOverride: returnType};
-            // Converted now
-            delete func.async;
         }
 
         // Create overload signatures for leading optional parameters
@@ -600,7 +602,7 @@ class Converter {
         if (extra) {
             // It has extra parameters, so output custom event handler
             let listenerName = '_' + this.convertName(`${this.namespace}_${name}_Event`);
-            this.additionalTypes.push(`type ${listenerName}<T = (${parameters.join(', ')}) => void> = WebExtEventBase<(callback: T, ${extra.join(', ')}) => void, T>;`);
+            this.additionalTypes.push(`type ${listenerName}<T = (${parameters.join(', ')}) => ${returnType}> = WebExtEventBase<(callback: T, ${extra.join(', ')}) => void, T>;`);
             return `${listenerName}`;
         } else {
             // It has no extra parameters, so just use the helper that we define in HEADER

@@ -79,6 +79,116 @@ for (let path of [
     }
     return x;
 });
+// Fix webrequest events
+for (let path of [
+    ['webRequest', 'events', 'onAuthRequired'],
+    ['webRequest', 'events', 'onBeforeRequest'],
+    ['webRequest', 'events', 'onBeforeSendHeaders'],
+    ['webRequest', 'events', 'onHeadersReceived'],
+]) converter.edit(...path, x => {
+    // Return type of the callback is weirder than the schemas can express
+    x.returns.converterTypeOverride = 'BlockingResponse | Promise<BlockingResponse>';
+    // It's also optional, since you can choose to just listen to the event
+    x.returns.optional = true;
+    return x;
+});
+// Fix webrequest events
+for (let path of [
+    ['webRequest', 'events', 'onAuthRequired'],
+    ['webRequest', 'events', 'onBeforeRequest'],
+    ['webRequest', 'events', 'onBeforeSendHeaders'],
+    ['webRequest', 'events', 'onHeadersReceived'],
+]) converter.edit(...path, x => {
+    // Return type of the callback is weirder than the schemas can express
+    x.returns.converterTypeOverride = 'BlockingResponse | Promise<BlockingResponse>';
+    // It's also optional, since you can choose to just listen to the event
+    x.returns.optional = true;
+    return x;
+});
+// Fix the lack of promise return in functions that firefox has but chrome doesn't
+for (let [namespace, funcs] of [
+    ['clipboard', [['setImageData', 'void']]],
+    ['contextualIdentities', [
+        ['create', 'ContextualIdentity'],
+        ['get', 'ContextualIdentity'],
+        ['query', 'ContextualIdentity[]'],
+        ['remove', 'ContextualIdentity'],
+        ['update', 'ContextualIdentity']
+    ]],
+    ['proxy', [
+        ['register', 'void'],
+        ['unregister', 'void']
+    ]],
+    ['theme', [
+        ['getCurrent', '_manifest.ThemeType'],
+        ['reset', false],
+        ['update', false]
+    ]],
+    ['browserAction', [['openPopup', 'void']]],
+    ['find', [
+        ['find', '{\ncount: number;\nrangeData?: Array<{\nframePos: number;\nstartTextNodePos: number;\nendTextNodePos: number;\nstartOffset: number;\nendOffset: number;\n}>;\nrectData?: Array<{\nrectsAndTexts: {\nrectList: Array<{\ntop: number;\nleft: number;\nbottom: number;\nright: number;\n}>;\ntextList: string[];\n};\ntextList: string;\n}>;\n}'],
+        ['highlightResults', false],
+        ['removeHighlighting', false]
+    ]],
+    ['pageAction', [
+        ['setPopup', false],
+        ['openPopup', 'void']
+    ]],
+    ['pkcs11', [
+        ['getModuleSlots', '{\nname: string;\ntoken?: {\nname: string;\nmanufacturer: string;\nHWVersion: string;\nFWVersion: string;\nserial: string;\nisLoggedIn: string;\n};\n}'],
+        ['installModule', 'void'],
+        ['isModuleInstalled', 'boolean'],
+        ['uninstallModule', 'void']
+    ]],
+    ['sessions', [
+        ['setTabValue', 'void'],
+        ['getTabValue', 'string | object | undefined'],
+        ['removeTabValue', 'void'],
+        ['setWindowValue', 'void'],
+        ['getWindowValue', 'string | object | undefined'],
+        ['removeWindowValue', 'void'],
+        ['forgetClosedTab', 'void'],
+        ['forgetClosedWindow', 'void'],
+        ['getRecentlyClosed', 'Session[]'],
+        ['restore', 'Session']
+    ]],
+    ['sidebarAction', [
+        ['close', 'void'],
+        ['open', 'void'],
+        ['setPanel', 'void'],
+        ['setIcon', 'void'],
+        ['setTitle', 'void'],
+        ['getPanel', 'string'],
+        ['getTitle', 'string']
+    ]],
+    ['tabs', [
+        ['discard', 'void'],
+        ['toggleReaderMode', 'void']
+    ]]
+]) {
+    for (let [name, ret] of funcs) converter.edit(namespace, 'functions', name, x => {
+        if (ret) {
+            x.returns = {converterTypeOverride: `Promise<${ret}>`};
+        } else {
+            x.returns = {converterTypeOverride: 'void'};
+        }
+        return x;
+    });
+}
+// Prevent some of Event from being promisified
+converter.edit('events', 'types', 'Event', x => {
+    for (let f of x.functions.slice(0,3)) {
+        f.async = false;
+    }
+    console.log(x);
+    return x;
+});
+// This should prob also not return promise
+converter.edit('devtools.panels', 'types', 'ElementsPanel', x => {
+    x.functions[0].async = false;
+    return x;
+});
+
 
 converter.convert();
 converter.write(argv['o']);
