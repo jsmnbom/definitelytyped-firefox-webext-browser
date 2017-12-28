@@ -104,6 +104,11 @@ for (let path of [
     x.returns.optional = true;
     return x;
 });
+// Additional fix for webrequest.onAuthRequired
+converter.edit('webRequest', 'events', 'onAuthRequired', x => {
+    x.parameters = x.parameters.filter(y => y.name !== 'callback');
+    return x;
+});
 // Fix the lack of promise return in functions that firefox has but chrome doesn't
 for (let [namespace, funcs] of [
     ['clipboard', [['setImageData', 'void']]],
