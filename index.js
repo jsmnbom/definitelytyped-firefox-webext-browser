@@ -9,7 +9,6 @@ node index.js -f 58.0 -s firefox-58.0b6/toolkit/components/extensions/schemas -s
 */
 
 "use strict";
-const _ = require("lodash");
 
 const argv = require("minimist")(process.argv.slice(2), {
     string: ['f']
@@ -180,7 +179,6 @@ converter.edit('events', 'types', 'Event', x => {
     for (let f of x.functions.slice(0,3)) {
         f.async = false;
     }
-    console.log(x);
     return x;
 });
 // This should prob also not return promise
