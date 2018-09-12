@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const stripJsonComments = require("strip-json-comments");
 const _ = require("lodash");
-const {descToMarkdown, toDocComment} = require('./desc-to-doc.js');
+const { descToMarkdown, toDocComment } = require('./desc-to-doc.js');
 
 // Reserved keywords in typescript
 const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else",
@@ -10,15 +10,15 @@ const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debug
     "return", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with"];
 
 // Types that are considered "simple"
-const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any'];
+const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any', 'null'];
 const ALREADY_OPTIONAL_RETURNS = ['any', 'undefined', 'void'];
 
 // Readable names for "allowedContexts" values from the schema
 const CONTEXT_NAMES = {
     'addon_parent': 'Add-on parent',
-    'content':      'Content scripts',
-    'devtools':     'Devtools pages',
-    'proxy':        'Proxy scripts',
+    'content': 'Content scripts',
+    'devtools': 'Devtools pages',
+    'proxy': 'Proxy scripts',
 };
 
 // Comment "X context only" for these contexts
@@ -83,7 +83,11 @@ function commentFromSchema(schema) {
         }
     }
     if (schema.deprecated) {
-        doclines.push(`@deprecated ${descToMarkdown(schema.deprecated)}`);
+        let desc = schema.deprecated;
+        if (typeof desc !== "string") {
+            desc = schema.description;
+        }
+        doclines.push(`@deprecated ${descToMarkdown(desc)}`);
     } else if (schema.unsupported) {
         doclines.push(`@deprecated Unsupported on Firefox at this time.`);
     }
@@ -317,14 +321,33 @@ class Converter {
             // We can only output enums in the namespace root (a schema enum, instead of e.g. a property having an enum as type)
             if (root) {
                 // So if we are in the root
-                // Add each enum value, sanitizing the name (if it has one, otherwise just using its value as name)
-                out += `{\n${type.enum.map(x => `${commentFromSchema(x)}${(x.name ? x.name : x).replace(/\W/g, '')} = "${x.name ? x.name : x}"`).join(',\n')}\n}`
+                // Add each enum value, sanitizing the name (if it has one, otherwise just using its value as name)                
+                const normalized = type.enum
+                    .map(x => {
+                        const comment = commentFromSchema(x);
+                        const value = x.name || x;
+                        const name = value.replace(/\W/g, '');
+                        return {
+                            comment,
+                            value,
+                            name,
+                        }
+                    })
+                    .filter(x => x.name);
+                out += `{\n${normalized.map(x => `${x.comment}${x.name} = "${x.value}"`).join(',\n')}\n}`
             } else {
-                // If we're not in the root, add the enum as an additional type instead, adding an _ in front of the name
-                // We convert the actual enum based on rules above by passing through the whole type code again, but this time as root
-                this.additionalTypes.push(`${commentFromSchema(type)}enum _${this.convertName(type.id)} ${this.convertType(type, true)}`);
-                // And then just reference it by name in output
-                out += '_' + this.convertName(type.id);
+                if (type.id) {
+                    const typeName = `_${this.convertName(type.id)}`;
+                    // If we're not in the root, add the enum as an additional type instead, adding an _ in front of the name
+                    // We convert the actual enum based on rules above by passing through the whole type code again, but this time as root
+                    this.additionalTypes.push(`${commentFromSchema(type)}const enum ${typeName} ${this.convertType(type, true)}`);
+                    // And then just reference it by name in output
+                    out += typeName;
+                } else {
+                    // inline
+                    const typeStr = type.enum.map(x => `"${x.name ? x.name : x}"`).join(" | ");
+                    out += typeStr;
+                }
             }
         } else if (type.type) {
             // The type has an actual type, check it
@@ -453,7 +476,7 @@ class Converter {
                 // If it has functions or events, or is an object that's not an instance of another one, it's an interface
                 convertedTypes.push(`${comment}interface ${type.id} ${convertedType}`);
             } else if (type.enum) {
-                convertedTypes.push(`${comment}enum ${this.convertName(type.id)} ${convertedType}`);
+                convertedTypes.push(`${comment}const enum ${this.convertName(type.id)} ${convertedType}`);
             } else {
                 // It's just a type of some kind
                 convertedTypes.push(`${comment}type ${type.id} = ${convertedType};`);
@@ -537,11 +560,11 @@ class Converter {
                 // Use void as return type if there were no parameters
                 // Note that the join is kinda useless (see long comments above)
                 let promiseReturn = parameters[0] || 'void';
-            if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | undefined';
+                if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | undefined';
                 returnType = `Promise<${promiseReturn}>`;
                 // Because of namespace extends(?), a few functions can pass through here twice,
                 // so override the return type since the callback was removed and it can't be converted again
-                func.returns = {converterTypeOverride: returnType};
+                func.returns = { converterTypeOverride: returnType };
                 // Converted now
                 delete func.async;
             } else if (func.async && func.async !== 'callback') {
@@ -567,7 +590,7 @@ class Converter {
         for (let [i, param] of (func.parameters || []).entries()) {
             if (isLeadingOptional(func.parameters, i)) {
                 // It won't be optional in the overload signature, so create a copy of it marked as non-optional
-                leadingOptionals.push({...param, optional: false});
+                leadingOptionals.push({ ...param, optional: false });
             } else {
                 rest.push(param);
             }
