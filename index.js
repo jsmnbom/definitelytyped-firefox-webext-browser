@@ -1,11 +1,15 @@
 /*
 Requires firefox source code to be downloaded, which can be found at https://archive.mozilla.org/pub/firefox/releases/ in the source subdirectory
+Install typescript with
+    npm install -g typescript
+Build with
+    tsc -p .
 Use as:
-node index.js -f <FIREFOX VERSION> -s <SCHEMAS1> -s <SCHEMAS2> -o <OUTPUT_FILE>
+node out/index.js -f <FIREFOX VERSION> -s <SCHEMAS1> -s <SCHEMAS2> -o <OUTPUT_FILE>
 Where SCHEMAS are toolkit/components/extensions/schemas and
 browser/components/extensions/schemas inside the firefox source directory.
 For example:
-node index.js -f 58.0 -s firefox-58.0b6/toolkit/components/extensions/schemas -s firefox-58.0b6/browser/components/extensions/schemas -o index.d.ts
+node out/index.js -f 58.0 -s firefox-58.0b6/toolkit/components/extensions/schemas -s firefox-58.0b6/browser/components/extensions/schemas -o index.d.ts
 */
 
 "use strict";
@@ -16,7 +20,7 @@ const argv = require("minimist")(process.argv.slice(2), {
 const Converter = require("./converter").Converter;
 
 // Namespace references that need renaming
-const NAMESPACE_ALIASES = {'contextMenusInternal': 'menusInternal', 'manifest': '_manifest'};
+const NAMESPACE_ALIASES = { 'contextMenusInternal': 'menusInternal', 'manifest': '_manifest' };
 
 // Header of the definitions file
 const HEADER = `// Type definitions for WebExtension Development in FireFox ${argv['f']}
@@ -50,7 +54,7 @@ converter.removeNamespace('test');
 converter.remove('_manifest', 'types', 'WebExtensionLangpackManifest');
 // browser.runtime.getManifest should return WebExtensionManifest
 converter.edit('runtime', 'functions', 'getManifest', x => {
-    x.returns = {'$ref': 'manifest.WebExtensionManifest'};
+    x.returns = { '$ref': 'manifest.WebExtensionManifest' };
     return x;
 });
 // Remove NativeManifest since it's not an exposed api
@@ -172,16 +176,16 @@ for (let [namespace, funcs] of [
 ]) {
     for (let [name, ret] of funcs) converter.edit(namespace, 'functions', name, x => {
         if (ret) {
-            x.returns = {converterTypeOverride: `Promise<${ret}>`};
+            x.returns = { converterTypeOverride: `Promise<${ret}>` };
         } else {
-            x.returns = {converterTypeOverride: 'void'};
+            x.returns = { converterTypeOverride: 'void' };
         }
         return x;
     });
 }
 // Prevent some of Event from being promisified
 converter.edit('events', 'types', 'Event', x => {
-    for (let f of x.functions.slice(0,3)) {
+    for (let f of x.functions.slice(0, 3)) {
         f.async = false;
     }
     return x;
