@@ -1,7 +1,9 @@
-const fs = require("fs");
-const path = require("path");
-const stripJsonComments = require("strip-json-comments");
-const _ = require("lodash");
+import * as fs from "fs";
+import * as path from "path";
+
+import stripJsonComments from "strip-json-comments";
+import * as _ from "lodash";
+
 const { descToMarkdown, toDocComment } = require('./desc-to-doc.js');
 
 // Reserved keywords in typescript
@@ -14,7 +16,7 @@ const SIMPLE_TYPES = ['string', 'integer', 'number', 'boolean', 'any', 'null'];
 const ALREADY_OPTIONAL_RETURNS = ['any', 'undefined', 'void'];
 
 // Readable names for "allowedContexts" values from the schema
-const CONTEXT_NAMES = {
+const CONTEXT_NAMES: Indexable<string> = {
     'addon_parent': 'Add-on parent',
     'content': 'Content scripts',
     'devtools': 'Devtools pages',
@@ -31,14 +33,17 @@ const CTX_CMT_NOT_ALLOWED_IN = ['content', 'devtools'];
 const CTX_CMT_ALLOWED_IN = ['proxy'];
 
 // Formats an allowedContexts array to a readable string
-function formatContexts(contexts, outputAlways = false) {
+function formatContexts(contexts: string[] | undefined, outputAlways = false) {
     if (!contexts || contexts.length === 0) {
+        return "";
+        /* @Review
         if (outputAlways) {
             // No contexts are specified, but we can likely still output something
             contexts = [];
         } else {
             return '';
         }
+        */
     }
     // Check if this thing is only allowed in one context
     for (let context of contexts) {
@@ -61,38 +66,43 @@ function formatContexts(contexts, outputAlways = false) {
 }
 
 // Creates a doc comment out of a schema object
-function commentFromSchema(schema) {
-    let doclines = [];
-    if (schema.description) {
-        doclines.push(descToMarkdown(schema.description));
+function commentFromSchema(schema: TypeSchema | NamespaceSchema | NameDesc) {
+    const namespace = schema as NamespaceSchema;
+    const type = schema as TypeSchema;
+
+    const doclines = [];
+    if (namespace.description) {
+        doclines.push(descToMarkdown(namespace.description));
     }
-    let contexts = formatContexts(schema.allowedContexts);
+
+    const contexts = formatContexts(namespace.allowedContexts);
     if (contexts) {
         // Separate with an empty line
         if (doclines.length > 0) doclines.push('');
         doclines.push(contexts);
     }
-    if (schema.parameters) {
-        for (let param of schema.parameters) {
+
+    if (type.parameters) {
+        for (const param of type.parameters) {
             // '@param' is redundant in TypeScript code if it has no description.
             if (!param.description) continue;
             // Square brackets around optional parameter names is a jsdoc convention
-            let name = (param.optional) ? `[${param.name}]` : param.name;
-            let desc = (param.description) ? ' ' + descToMarkdown(param.description) : '';
+            const name = (param.optional) ? `[${param.name}]` : param.name;
+            const desc = (param.description) ? ' ' + descToMarkdown(param.description) : '';
             doclines.push(`@param ${name}${desc}`);
         }
     }
-    if (schema.deprecated) {
-        let desc = schema.deprecated;
+    if (type.deprecated) {
+        let desc = type.deprecated;
         if (typeof desc !== "string") {
-            desc = schema.description;
+            desc = type.description || "";
         }
         doclines.push(`@deprecated ${descToMarkdown(desc)}`);
-    } else if (schema.unsupported) {
+    } else if (type.unsupported) {
         doclines.push(`@deprecated Unsupported on Firefox at this time.`);
     }
-    if (schema.returns && schema.returns.description) {
-        doclines.push(`@returns ${descToMarkdown(schema.returns.description)}`);
+    if (type.returns && type.returns.description) {
+        doclines.push(`@returns ${descToMarkdown(type.returns.description)}`);
     }
     if (doclines.length === 0) {
         return '';
@@ -101,7 +111,7 @@ function commentFromSchema(schema) {
 }
 
 // Iterate over plain objects in nested objects and arrays
-function* deepIteratePlainObjects(item) {
+function* deepIteratePlainObjects(item: object): Iterable<object> {
     if (_.isArray(item)) {
         // Got an array, check its elements
         for (let x of item) {
@@ -117,8 +127,20 @@ function* deepIteratePlainObjects(item) {
     }
 }
 
-class Converter {
-    constructor(folders, header, namespace_aliases) {
+export class Converter {
+
+    out: string;
+    readonly namespace_aliases: Indexable<string>;
+    readonly schemaData: [string, NamespaceSchema[]][];
+    readonly namespaces: Indexable<NamespaceSchema>;
+    namespace: string = "";
+    additionalTypes: string[] = [];
+    types: string[] = [];
+    properties: string[] = [];
+    functions: string[] = [];
+    events: string[] = [];
+
+    constructor(folders: string[], header: string, namespace_aliases: Indexable<string>) {
         // Generated source
         this.out = header;
 
@@ -131,6 +153,7 @@ class Converter {
         // Convert from split schemas to namespace
         // This merges all the properties that we care about for each namespace
         // Needed since many schema files add to the "manifest" namespace
+
         this.namespaces = {};
         for (let data of this.schemaData) {
             // Enumerate the actual namespace data
@@ -141,8 +164,9 @@ class Converter {
                 }
 
                 // If we haven't seen this namespace before, init it
+                let resNamespace: NamespaceSchema;
                 if (!this.namespaces.hasOwnProperty(namespace.namespace)) {
-                    this.namespaces[namespace.namespace] = {
+                    resNamespace = {
                         namespace: namespace.namespace,
                         types: [],
                         properties: {},
@@ -152,23 +176,43 @@ class Converter {
                         permissions: [],
                         allowedContexts: []
                     };
+                    this.namespaces[namespace.namespace] = resNamespace;
+                } else {
+                    resNamespace = this.namespaces[namespace.namespace]
                 }
-                // Concat or extend namespace
-                if (namespace.types) this.namespaces[namespace.namespace].types = this.namespaces[namespace.namespace].types.concat(namespace.types);
-                if (namespace.properties) this.namespaces[namespace.namespace].properties = Object.assign(this.namespaces[namespace.namespace].properties, namespace.properties);
-                if (namespace.functions) this.namespaces[namespace.namespace].functions = this.namespaces[namespace.namespace].functions.concat(namespace.functions);
-                if (namespace.events) this.namespaces[namespace.namespace].events = this.namespaces[namespace.namespace].events.concat(namespace.events);
-                if (namespace.description) this.namespaces[namespace.namespace].description = namespace.description;
-                if (namespace.permissions) this.namespaces[namespace.namespace].permissions = this.namespaces[namespace.namespace].permissions.concat(namespace.permissions);
-                if (namespace.allowedContexts) this.namespaces[namespace.namespace].allowedContexts = this.namespaces[namespace.namespace].allowedContexts.concat(namespace.allowedContexts);
 
-                if (namespace['$import']) this.namespaces[namespace.namespace]['$import'] = namespace['$import']
+                // Concat or extend namespace
+
+                if (namespace.types) {
+                    resNamespace.types!.push(...namespace.types);
+                }
+                if (namespace.properties) {
+                    Object.assign(resNamespace.properties, namespace.properties);
+                }
+                if (namespace.functions) {
+                    resNamespace.functions!.push(...namespace.functions);
+                }
+                if (namespace.events) {
+                    resNamespace.events!.push(...namespace.events);
+                }
+                if (namespace.description) {
+                    resNamespace.description = namespace.description;
+                }
+                if (namespace.permissions) {
+                    resNamespace.permissions!.push(...namespace.permissions);
+                }
+                if (namespace.allowedContexts) {
+                    resNamespace.allowedContexts.push(...namespace.allowedContexts);
+                }
+                if (namespace.$import) {
+                    resNamespace.$import = namespace.$import
+                };
             }
         }
     }
 
     setUnsupportedAsOptional() {
-        for (let type of deepIteratePlainObjects(this.namespaces)) {
+        for (let type of deepIteratePlainObjects(this.namespaces) as TypeSchema[]) {
             if (type.unsupported) {
                 type.optional = true;
             }
@@ -183,33 +227,35 @@ class Converter {
         }
     }
 
-    collectSchemas(folders) {
+    collectSchemas(folders: string[]) {
         // For each schema file
         for (let folder of folders) {
             const files = fs.readdirSync(folder);
             for (let file of files) {
                 if (path.extname(file) === '.json') {
                     // Strip json comments, parse and add to data array
-                    this.schemaData.push([file, JSON.parse(stripJsonComments(String(fs.readFileSync(path.join(folder, file)))))]);
+                    let json = String(fs.readFileSync(path.join(folder, file)));
+                    json = stripJsonComments(json);
+                    this.schemaData.push([file, JSON.parse(json)]);
                 }
             }
         }
     }
 
     // noinspection JSMethodCanBeStatic
-    convertPrimitive(type) {
+    convertPrimitive(type: string) {
         if (type === 'integer') {
             return 'number'
         }
         return type;
     }
 
-    convertClass(type) {
+    convertClass(type: TypeSchema) {
         // Convert each property, function and event of a class
         let out = `{\n`;
         let convertedProperties = this.convertObjectProperties(type);
         if (type.functions) for (let func of type.functions) {
-            convertedProperties.push(this.convertFunction(func, true, true, true));
+            convertedProperties.push(this.convertFunction(func, true, true));
         }
         if (type.events) for (let event of type.events) {
             convertedProperties.push(this.convertEvent(event, true));
@@ -220,7 +266,7 @@ class Converter {
         return out;
     }
 
-    convertObjectProperties(type) {
+    convertObjectProperties(type: TypeSchema) {
         let convertedProperties = [];
         // For each simple property
         if (type.properties) {
@@ -247,7 +293,7 @@ class Converter {
         return convertedProperties;
     }
 
-    convertRef(ref) {
+    convertRef(ref: string) {
         // Get the namespace of the reference, if any
         let namespace = ref.split('.')[0];
         // Do we have an alias for that namesapce?
@@ -265,7 +311,7 @@ class Converter {
             // Add browser. to the front
             // Okay, apparently typescript doesn't need that, as all the namepaces are combined by the compiler
             //out += 'browser.';
-        } else if (!this.namespaces[this.namespace].types.find(x => x.id === ref)) {
+        } else if (!this.namespaces[this.namespace].types!.find(x => x.id === ref)) {
             console.log(`Warning: Cannot find reference "${ref}", assuming the browser knows better.`);
             // Add a type X = any, so the type can be used, but won't be typechecked
             this.additionalTypes.push(`type ${ref} = any;`);
@@ -274,12 +320,12 @@ class Converter {
     }
 
     // noinspection JSMethodCanBeStatic
-    convertName(name) {
+    convertName(name: string) {
         // Convert from snake_case to PascalCase
         return name.split('_').map(x => x.charAt(0).toUpperCase() + x.slice(1)).join('');
     }
 
-    convertType(type, root = false) {
+    convertType(type: TypeSchema, root = false): string {
         // Check if we've overridden it, likely for a type that can't be represented in json schema
         if (type.converterTypeOverride) {
             return type.converterTypeOverride;
@@ -289,8 +335,8 @@ class Converter {
         if (type.choices) {
             // Okay so it's a choice between several types, we need to check
             // if choices include enums, and if so combine them
-            let choices = [];
-            let enums = [];
+            let choices: TypeSchema[] = [];
+            let enums: Enum[] = [];
             for (let choice of type.choices) {
                 if (choice.enum) {
                     enums = enums.concat(choice.enum);
@@ -324,8 +370,15 @@ class Converter {
                 // Add each enum value, sanitizing the name (if it has one, otherwise just using its value as name)                
                 const normalized = type.enum
                     .map(x => {
-                        const comment = commentFromSchema(x);
-                        const value = x.name || x;
+                        let comment: string;
+                        let value: string
+                        if (typeof x !== "string") {
+                            comment = commentFromSchema(x);
+                            value = x.name;
+                        } else {
+                            comment = "";
+                            value = x;
+                        }
                         const name = value.replace(/\W/g, '');
                         return {
                             comment,
@@ -345,7 +398,7 @@ class Converter {
                     out += typeName;
                 } else {
                     // inline
-                    const typeStr = type.enum.map(x => `"${x.name ? x.name : x}"`).join(" | ");
+                    const typeStr = type.enum.map(x => `"${x}"`).join(" | ");
                     out += typeStr;
                 }
             }
@@ -354,7 +407,7 @@ class Converter {
             if (type.type === 'object') {
                 // It's an object, how is the object constructed?
                 if (type.functions || type.events) {
-                    // It has functions or events, treat it as a claas
+                    // It has functions or events, treat it as a class
                     out += this.convertClass(type);
                 } else if (type.properties || type.patternProperties) {
                     // It has properties, convert those
@@ -393,11 +446,11 @@ class Converter {
                 // Does it specify a fixed amount of items?
                 if (type.minItems && type.maxItems && type.minItems === type.maxItems) {
                     // Yes, fixed amount of items, output it as an array literal
-                    out += `[${new Array(type.minItems).fill(this.convertType(type.items)).join(', ')}]`
+                    out += `[${new Array(type.minItems).fill(this.convertType(type.items!)).join(', ')}]`
                 } else if (type.items) {
                     // Figure out the array type, passing parent name
                     type.items.id = type.id;
-                    let arrayType = this.convertType(type.items);
+                    let arrayType = this.convertType(type.items) as string;
                     // Very bad check to see if it's a "simple" type in array terms
                     // This just checks if it's an enum or object, really
                     // TODO: Could probably be done better
@@ -417,9 +470,9 @@ class Converter {
                 // It's a simple primitive
                 out += this.convertPrimitive(type.type);
             }
-        } else if (type['$ref']) {
+        } else if (type.$ref) {
             // If it's a reference
-            out += this.convertRef(type['$ref']);
+            out += this.convertRef(type.$ref);
         } else if (type.value) {
             // If it has a fixed value, just set its type as the type of said value
             out += typeof type.value;
@@ -431,14 +484,14 @@ class Converter {
         return out;
     }
 
-    collapseExtendedTypes(types) {
-        let collapsedTypes = {};
+    collapseExtendedTypes(types: TypeSchema[]) {
+        let collapsedTypes: Indexable<TypeSchema> = {};
         // For each type
         for (let type of types) {
             // Get its id or the id of the type it extends
-            let name = type['$extend'] || type.id;
+            let name = type.$extend || type.id as string;
             // Don't want this key to be merged (as it could cause conflicts if that is even possible)
-            delete type['$extend'];
+            delete type.$extend;
             // Have we seen it before?
             if (collapsedTypes.hasOwnProperty(name)) {
                 // Merge with the type we already have, concatting any arrays
@@ -455,7 +508,7 @@ class Converter {
         return Object.values(collapsedTypes);
     }
 
-    convertTypes(types) {
+    convertTypes(types: TypeSchema[] | undefined) {
         if (types === undefined) return [];
         // Collapse types that have an $extend in them
         types = this.collapseExtendedTypes(types);
@@ -476,7 +529,7 @@ class Converter {
                 // If it has functions or events, or is an object that's not an instance of another one, it's an interface
                 convertedTypes.push(`${comment}interface ${type.id} ${convertedType}`);
             } else if (type.enum) {
-                convertedTypes.push(`${comment}const enum ${this.convertName(type.id)} ${convertedType}`);
+                convertedTypes.push(`${comment}const enum ${this.convertName(type.id as string)} ${convertedType}`);
             } else {
                 // It's just a type of some kind
                 convertedTypes.push(`${comment}type ${type.id} = ${convertedType};`);
@@ -485,7 +538,7 @@ class Converter {
         return convertedTypes
     }
 
-    convertProperties(properties) {
+    convertProperties(properties: Indexable<TypeSchema> | undefined) {
         if (properties === undefined) return [];
         let convertedProperties = [];
         // For each property, just add it as a const, appending | undefined if it's optional
@@ -495,23 +548,23 @@ class Converter {
         return convertedProperties;
     }
 
-    convertParameters(parameters, includeName = true, name = undefined) {
+    convertParameters(parameters: TypeSchema[] | undefined, includeName = true, name?: string) {
         if (parameters === undefined) return [];
         let convertedParameters = [];
         // For each parameter
-        for (let parameter of Object.keys(parameters)) {
+        for (let parameter of parameters) {
             let out = '';
             // If includeName then include the name (add ? if optional)
-            if (includeName) out += `${parameters[parameter].name ? parameters[parameter].name : parameter}${parameters[parameter].optional ? '?' : ''}: `;
+            if (includeName) out += `${parameter.name ? parameter.name : parameter}${parameter.optional ? '?' : ''}: `;
             // Convert the paremeter type passing parent id as id
-            parameters[parameter].id = name;
-            out += this.convertType(parameters[parameter]);
+            parameter.id = name;
+            out += this.convertType(parameter);
             convertedParameters.push(out);
         }
         return convertedParameters;
     }
 
-    convertSingleFunction(name, returnType, arrow, classy, func) {
+    convertSingleFunction(name: string, returnType: string, arrow: boolean, classy: boolean, func: TypeSchema) {
         let parameters = this.convertParameters(func.parameters, true, func.name);
         // function x() {} or () => {}?
         if (arrow) {
@@ -529,10 +582,10 @@ class Converter {
         }
     }
 
-    convertFunction(func, arrow = false, classy = false) {
+    convertFunction(func: TypeSchema, arrow = false, classy = false) {
         let out = '';
         // Assume it returns void until proven otherwise
-        let returnType = 'void';
+        let returnType: string | TypeSchema = 'void';
         // Prove otherwise? either a normal returns or as an async promise
         if (func.returns) {
             returnType = this.convertType(func.returns);
@@ -543,7 +596,7 @@ class Converter {
             let callback = func.parameters && func.parameters.find(x => x.type === 'function' && x.name === func.async);
             if (callback) {
                 // Remove callback from parameters as we're gonna handle it as a promise return
-                func.parameters = func.parameters.filter(x => x !== callback);
+                func.parameters = func.parameters!.filter(x => x !== callback);
                 let parameters = this.convertParameters(callback.parameters, false, func.name);
                 if (parameters.length > 1) {
                     // Since these files are originally chrome, some things are a bit weird
@@ -578,17 +631,17 @@ class Converter {
         // Therefore output multiple function choices where we one by one, strip the optional status
 
         // Check if "parameters[index]" is optional with at least one required parameter following it
-        let isLeadingOptional = (parameters, index) => {
+        let isLeadingOptional = (parameters: TypeSchema[], index: number) => {
             let firstRequiredIndex = parameters.findIndex(x => !x.optional);
             return firstRequiredIndex > index;
         };
 
         // Optional parameters with at least one required parameter following them, marked as non-optional
-        let leadingOptionals = [];
+        let leadingOptionals: TypeSchema[] = [];
         // The rest of the parameters
         let rest = [];
         for (let [i, param] of (func.parameters || []).entries()) {
-            if (isLeadingOptional(func.parameters, i)) {
+            if (isLeadingOptional(func.parameters!, i)) {
                 // It won't be optional in the overload signature, so create a copy of it marked as non-optional
                 leadingOptionals.push({ ...param, optional: false });
             } else {
@@ -597,7 +650,7 @@ class Converter {
         }
 
         // Output the normal signature
-        out += this.convertSingleFunction(func.name, returnType, arrow, classy, {
+        out += this.convertSingleFunction(func.name!, returnType, arrow, classy, {
             ...func,
             parameters: rest,
         });
@@ -607,13 +660,13 @@ class Converter {
                 ...func,
                 parameters: leadingOptionals.slice(i).concat(rest),
             };
-            out += "\n" + this.convertSingleFunction(func.name, returnType, arrow, classy, funcWithParams) + (classy ? ';\n' : '');
+            out += "\n" + this.convertSingleFunction(func.name!, returnType, arrow, classy, funcWithParams) + (classy ? ';\n' : '');
         }
 
         return out;
     }
 
-    convertFunctions(functions) {
+    convertFunctions(functions: TypeSchema[] | undefined) {
         if (functions === undefined) return [];
         let convertedFunctions = [];
         for (let func of functions) {
@@ -623,7 +676,7 @@ class Converter {
     }
 
     // noinspection JSMethodCanBeStatic
-    convertSingleEvent(parameters, returnType, extra, name) {
+    convertSingleEvent(parameters: string[], returnType: string, extra: string[] | undefined, name: string) {
         if (extra) {
             // It has extra parameters, so output custom event handler
             let listenerName = '_' + this.convertName(`${this.namespace}_${name}_Event`);
@@ -635,7 +688,7 @@ class Converter {
         }
     }
 
-    convertEvent(event, classy = false) {
+    convertEvent(event: TypeSchema, classy = false) {
         let out = '';
         // Assume it returns void until proven otherwise
         let returnType = 'void';
@@ -659,7 +712,7 @@ class Converter {
         // So we get an event that's '(one, two) | (two)' instead of '(one?, two)'
         for (let i = 0; i < parameters.length; i++) {
             if (parameters[i].includes('?') && parameters.length > i + 1) {
-                out += '\n| ' + this.convertSingleEvent(parameters.slice(i + 1), returnType, extra, event.name);
+                out += '\n| ' + this.convertSingleEvent(parameters.slice(i + 1), returnType, extra, event.name!);
             } else {
                 break;
             }
@@ -672,7 +725,7 @@ class Converter {
         });
 
         // Add const and ; if we're not in a class
-        out = `${!classy ? 'const ' : ''}${event.name}: ${this.convertSingleEvent(parameters, returnType, extra, event.name)}${out}${!classy && event.optional ? ' | undefined' : ''}${!classy ? ';' : ''}`;
+        out = `${!classy ? 'const ' : ''}${event.name}: ${this.convertSingleEvent(parameters, returnType, extra, event.name!)}${out}${!classy && event.optional ? ' | undefined' : ''}${!classy ? ';' : ''}`;
 
         // Comment it
         out = commentFromSchema(event) + out;
@@ -680,7 +733,7 @@ class Converter {
         return out;
     }
 
-    convertEvents(events) {
+    convertEvents(events: TypeSchema[] | undefined) {
         if (events === undefined) return [];
         let convertedEvents = [];
         for (let event of events) {
@@ -694,9 +747,9 @@ class Converter {
         let data = this.namespaces[this.namespace];
         let out = '';
 
-        if (data['$import']) {
+        if (data.$import) {
             let skipKeys = ['namespace', 'description', 'permissions'];
-            _.mergeWith(data, this.namespaces[data['$import']], (objValue, srcValue, key) => {
+            _.mergeWith(data, this.namespaces[data.$import], (objValue, srcValue, key) => {
                 if (skipKeys.includes(key)) return objValue;
                 if (_.isArray(objValue)) {
                     return _.uniqWith(objValue.concat(srcValue), (arrVal, othVal) => {
@@ -762,35 +815,34 @@ class Converter {
         this.out += out;
     }
 
-    write(filename) {
+    write(filename: string) {
         // Delete file
-        fs.truncate(filename, 0, function () {
+        fs.truncate(filename, 0, () => {
             // Write this.out to file except the very last character (which is an extra \n)
             fs.writeFileSync(filename, this.out.slice(0, this.out.length - 1));
-        }.bind(this));
+        });
     }
 
-    removeNamespace(name) {
+    removeNamespace(name: string) {
         delete this.namespaces[name];
     }
 
-    getIndex(namespace, section, id_or_name) {
-        return this.namespaces[namespace][section].findIndex(x => {
+    getIndex(namespace: string, section: string, id_or_name: string): number {
+        return (this.namespaces[namespace] as any)[section].findIndex((x: TypeSchema) => {
             return x['id'] === id_or_name
                 || x['name'] === id_or_name
-                || x['$extends'] === id_or_name
+                || x['$extend'] === id_or_name
                 || x['$import'] === id_or_name;
         });
     }
 
-    remove(namespace, section, id_or_name) {
-        this.namespaces[namespace][section].splice(this.getIndex(namespace, section, id_or_name), 1);
+    remove(namespace: string, section: string, id_or_name: string) {
+        (this.namespaces[namespace] as any)[section].splice(this.getIndex(namespace, section, id_or_name), 1);
     }
 
-    edit(namespace, section, id_or_name, edit) {
-        let index = this.getIndex(namespace, section, id_or_name);
-        this.namespaces[namespace][section][index] = edit(this.namespaces[namespace][section][index]);
+    edit(namespace: string, section: string, id_or_name: string, edit: (x: any) => any) {
+        const index = this.getIndex(namespace, section, id_or_name);
+        const sectionObj = (this.namespaces[namespace] as any)[section];
+        sectionObj[index] = edit(sectionObj[index]);
     }
 }
-
-exports.Converter = Converter;
