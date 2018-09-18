@@ -2,11 +2,12 @@
     "name": "definitelytyped-firefox-webext-browser",
     "version": "1.0.0",
     "description": "Generate typescript/definitelytyped definitions for Firefox Webextension developement.",
-    "main": "index.js",
+    "main": "build/index.js",
+    "typings": "build/index.d.ts",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
     },
-    "author": "Jacob Bom",
+    "author": "Jasmin Bom",
     "license": "MIT",
     "private": true,
     "devDependencies": {
@@ -16,7 +17,9 @@
         "to-markdown": "^3.1.1",
         "@types/node": "8.*",
         "@types/strip-json-comments": "^0.0.30",
-        "@types/lodash": "^4.14.116"
+        "@types/lodash": "^4.14.116",
+        "@types/minimist": "^1.2.0",
+        "typescript": "^3.0.1"
     },
     "dependencies": {}
 }

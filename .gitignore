@@ -60,11 +60,7 @@ typings/
 # Jetbrains IDEs
 .idea/
 
-# Symlinked DefinitelyTyped folder
-# I symlink DefinitelyTyped/types/firefox-webext-browser to here, so I can work with everything in one IDE instance
-firefox-webext-browser/
-
 # Visual Studio Code
 .vscode/
 
-out/
+build/

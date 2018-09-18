@@ -1,15 +1,15 @@
 /*
 Requires firefox source code to be downloaded, which can be found at https://archive.mozilla.org/pub/firefox/releases/ in the source subdirectory
-Install typescript with
-    npm install -g typescript
+Install node modules using
+    npm install
 Build with
     tsc -p .
 Use as:
-node out/index.js -f <FIREFOX VERSION> -s <SCHEMAS1> -s <SCHEMAS2> -o <OUTPUT_FILE>
+    node build/index.js -f <FIREFOX VERSION> -s <SCHEMAS1> -s <SCHEMAS2> -o <OUTPUT_FILE>
 Where SCHEMAS are toolkit/components/extensions/schemas and
 browser/components/extensions/schemas inside the firefox source directory.
 For example:
-node out/index.js -f 58.0 -s firefox-58.0b6/toolkit/components/extensions/schemas -s firefox-58.0b6/browser/components/extensions/schemas -o index.d.ts
+    node index.js -f 63.0 -s firefox-63.0b6/toolkit/components/extensions/schemas -s firefox-63.0b6/browser/components/extensions/schemas -o index.d.ts
 */
 
 "use strict";
@@ -17,7 +17,8 @@ node out/index.js -f 58.0 -s firefox-58.0b6/toolkit/components/extensions/schema
 const argv = require("minimist")(process.argv.slice(2), {
     string: ['f']
 });
-const Converter = require("./converter").Converter;
+
+import {Converter} from "./converter";
 
 // Namespace references that need renaming
 const NAMESPACE_ALIASES = { 'contextMenusInternal': 'menusInternal', 'manifest': '_manifest' };
@@ -25,10 +26,10 @@ const NAMESPACE_ALIASES = { 'contextMenusInternal': 'menusInternal', 'manifest':
 // Header of the definitions file
 const HEADER = `// Type definitions for WebExtension Development in FireFox ${argv['f']}
 // Project: https://developer.mozilla.org/en-US/Add-ons/WebExtensions
-// Definitions by: Jacob Bom <https://github.com/bomjacob>
+// Definitions by: Jasmin Bom <https://github.com/jsmnbom>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
-// TypeScript Version: 2.4
-// Generated using script at github.com/bomjacob/definitelytyped-firefox-webext-browser
+// TypeScript Version: 2.9
+// Generated using script at github.com/jsmnbom/definitelytyped-firefox-webext-browser
 
 interface WebExtEventBase<TAddListener extends (...args: any[]) => any, TCallback> {
     addListener: TAddListener;
@@ -44,28 +45,31 @@ interface Window {
 
 `;
 
-let converter = new Converter(argv['s'], HEADER, NAMESPACE_ALIASES);
+let converter = new Converter(Array.isArray(argv['s']) ? argv['s'] : new Array(argv['s']), HEADER, NAMESPACE_ALIASES);
 converter.setUnsupportedAsOptional();
 
 /* Customizations */
 // Remove test namespace since it's not exposed in api
 converter.removeNamespace('test');
-// Remove manifest.WebExtensionLangpackManifest as it's not exposed api
-converter.remove('_manifest', 'types', 'WebExtensionLangpackManifest');
 // browser.runtime.getManifest should return WebExtensionManifest
 converter.edit('runtime', 'functions', 'getManifest', x => {
     x.returns = { '$ref': 'manifest.WebExtensionManifest' };
     return x;
 });
-// Remove NativeManifest since it's not an exposed api
-converter.remove('_manifest', 'types', 'NativeManifest');
+// Fix dupe _NativeManifestType
+converter.edit('_manifest', 'types', 'NativeManifest', x => {
+    x.choices[0].properties.type.converterTypeOverride = '"pkcs11"| "stdio"';
+    x.choices[1].properties.type.converterTypeOverride = '"storage"';
+    return x;
+});
 // Fix events dealing with messages
-for (let path of [
+let test: Array<[string, string, string]> = [
     ['runtime', 'events', 'onMessage'],
     ['runtime', 'events', 'onMessageExternal'],
     ['extension', 'events', 'onRequest'],
     ['extension', 'events', 'onRequestExternal'],
-]) converter.edit(...path, x => {
+];
+for (let path of test) converter.edit_path(path, x => {
     // The message parameter actually isn't optional
     x.parameters[0].optional = false;
     // Add a missing parameter to sendResponse
@@ -83,12 +87,12 @@ for (let path of [
     return x;
 });
 // Fix webrequest events
-for (let path of [
+for (let path of <string[][]> [
     ['webRequest', 'events', 'onAuthRequired'],
     ['webRequest', 'events', 'onBeforeRequest'],
     ['webRequest', 'events', 'onBeforeSendHeaders'],
     ['webRequest', 'events', 'onHeadersReceived'],
-]) converter.edit(...path, x => {
+]) converter.edit_path(path, x => {
     // Return type of the callback is weirder than the schemas can express
     x.returns.converterTypeOverride = 'BlockingResponse | Promise<BlockingResponse>';
     // It's also optional, since you can choose to just listen to the event
@@ -96,12 +100,12 @@ for (let path of [
     return x;
 });
 // Fix webrequest events
-for (let path of [
+for (let path of <string[][]> [
     ['webRequest', 'events', 'onAuthRequired'],
     ['webRequest', 'events', 'onBeforeRequest'],
     ['webRequest', 'events', 'onBeforeSendHeaders'],
     ['webRequest', 'events', 'onHeadersReceived'],
-]) converter.edit(...path, x => {
+]) converter.edit_path(path, x => {
     // Return type of the callback is weirder than the schemas can express
     x.returns.converterTypeOverride = 'BlockingResponse | Promise<BlockingResponse>';
     // It's also optional, since you can choose to just listen to the event
@@ -110,11 +114,11 @@ for (let path of [
 });
 // Additional fix for webrequest.onAuthRequired
 converter.edit('webRequest', 'events', 'onAuthRequired', x => {
-    x.parameters = x.parameters.filter(y => y.name !== 'callback');
+    x.parameters = x.parameters.filter((y: TypeSchema) => y.name !== 'callback');
     return x;
 });
 // Fix the lack of promise return in functions that firefox has but chrome doesn't
-for (let [namespace, funcs] of [
+for (let [namespace, funcs] of <Array<[string, Array<[string, boolean|string]>]>> [
     ['clipboard', [['setImageData', 'void']]],
     ['contextualIdentities', [
         ['create', 'ContextualIdentity'],
@@ -171,7 +175,9 @@ for (let [namespace, funcs] of [
     ]],
     ['tabs', [
         ['discard', 'void'],
-        ['toggleReaderMode', 'void']
+        ['toggleReaderMode', 'void'],
+        ['show', 'void'],
+        ['hide', 'number[]']
     ]]
 ]) {
     for (let [name, ret] of funcs) converter.edit(namespace, 'functions', name, x => {
@@ -195,7 +201,18 @@ converter.edit('devtools.panels', 'types', 'ElementsPanel', x => {
     x.functions[0].async = false;
     return x;
 });
-
+// Remove bookmarks.import and bookmarks.export as it breaks things
+// https://github.com/DefinitelyTyped/DefinitelyTyped/issues/24937
+converter.remove('bookmarks', 'functions', 'import');
+converter.remove('bookmarks', 'functions', 'export');
+converter.remove('bookmarks', 'events', 'onImportBegan');
+converter.remove('bookmarks', 'events', 'onImportEnded');
+// Fix runtime.Port.postMessage
+// https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23542
+converter.edit('runtime', 'types', 'Port', Port => {
+    Port.properties.postMessage.parameters = [{type: "object", name: "message"}];
+    return Port
+});
 
 converter.convert();
 converter.write(argv['o']);

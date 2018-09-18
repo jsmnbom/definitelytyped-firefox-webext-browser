@@ -1,7 +1,8 @@
 const toMarkdown = require('to-markdown');
-const {URL} = require('url');
 
-function prefixLines(s, prefix) {
+const URL = require("url");
+
+function prefixLines(s: string, prefix: string) {
     let escapedReplacement = prefix.replace(/\$/g, '$$$$');
     return s.replace(/^.*$/gm, `${escapedReplacement}$&`);
 }
@@ -13,7 +14,7 @@ const DOC_END = ' */';
 /**
  * converts a string to a doc comment
  */
-function toDocComment(content) {
+export function toDocComment(content: string) {
     let isSingleLine = !(content.includes('\n') || content.length > 100);
     if (isSingleLine) {
         return DOC_START + ' ' + content + DOC_END;
@@ -21,7 +22,7 @@ function toDocComment(content) {
     return DOC_START + '\n' + prefixLines(content, DOC_CONT) + '\n' + DOC_END;
 }
 
-function isValidURL(url) {
+function isValidURL(url: string | null) {
     try {
         new URL(url);
         return true;
@@ -34,26 +35,26 @@ const toMarkdownOptions = {
     converters: [
         // un-linkify links to just fragment identifiers or relative urls meant for chrome docs pages
         {
-            filter: (element) => (element.tagName === 'A') && !isValidURL(element.getAttribute('href')),
-            replacement: (content) => content,
+            filter: (element: HTMLElement) => (element.tagName === 'A') && !isValidURL(element.getAttribute('href')),
+            replacement: (content: string) => content,
         },
         // variable name
         {
             filter: 'var',
-            replacement: (content) => `\`${content}\``,
+            replacement: (content: string) => `\`${content}\``,
         },
         // markdown has no definition lists, imitate them
         {
             filter: 'dl',
-            replacement: (content) => `${content}\n`,
+            replacement: (content: string) => `${content}\n`,
         },
         {
             filter: 'dt',
-            replacement: (content) => `*${content}*:\n`,
+            replacement: (content: string) => `*${content}*:\n`,
         },
         {
             filter: 'dd',
-            replacement: (content) => `  ${content}  \n`,
+            replacement: (content: string) => `  ${content}  \n`,
         }
     ]
 };
@@ -61,14 +62,14 @@ const toMarkdownOptions = {
 /**
  * converts an html description from the extension manifests to markdown for a doc comment
  */
-function descToMarkdown(description) {
+export function descToMarkdown(description: string) {
 
     // reference to another thing in code
     // > The $(ref:runtime.onConnect) event is fired [...]
     description = description.replace(/\$\(ref:(.*?)\)/g, '<code>$1</code>');
     // link to chrome docs
     // > For more details, see $(topic:messaging)[Content Script Messaging].
-    description = description.replace(/\$\(topic:(.*?)\)\[(.*?)\]/g, '$2');
+    description = description.replace(/\$\(topic:(.*?)\)\[(.*?)]/g, '$2');
     // chrome.* -> browser.*
     description = description.replace(/\bchrome\.(?=[a-zA-Z])/, 'browser.');
 
@@ -79,6 +80,3 @@ function descToMarkdown(description) {
 
     return description;
 }
-
-exports.descToMarkdown = descToMarkdown;
-exports.toDocComment = toDocComment;

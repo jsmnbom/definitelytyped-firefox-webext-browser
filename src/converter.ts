@@ -4,7 +4,7 @@ import * as path from "path";
 import stripJsonComments from "strip-json-comments";
 import * as _ from "lodash";
 
-const { descToMarkdown, toDocComment } = require('./desc-to-doc.js');
+import {descToMarkdown, toDocComment} from './desc-to-doc';
 
 // Reserved keywords in typescript
 const RESERVED = ["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else",
@@ -35,15 +35,12 @@ const CTX_CMT_ALLOWED_IN = ['proxy'];
 // Formats an allowedContexts array to a readable string
 function formatContexts(contexts: string[] | undefined, outputAlways = false) {
     if (!contexts || contexts.length === 0) {
-        return "";
-        /* @Review
         if (outputAlways) {
             // No contexts are specified, but we can likely still output something
             contexts = [];
         } else {
             return '';
         }
-        */
     }
     // Check if this thing is only allowed in one context
     for (let context of contexts) {
@@ -53,12 +50,12 @@ function formatContexts(contexts: string[] | undefined, outputAlways = false) {
     }
     let lines = [];
     // If a context from CTX_CMT_NOT_ALLOWED_IN isn't in contexts, comment it as "not allowed in"
-    let notAllowedIn = CTX_CMT_NOT_ALLOWED_IN.filter(context => !contexts.includes(context));
+    let notAllowedIn = CTX_CMT_NOT_ALLOWED_IN.filter(context => !contexts!.includes(context));
     if (notAllowedIn.length > 0) {
         lines.push(`Not allowed in: ${notAllowedIn.map(ctx => CONTEXT_NAMES[ctx]).join(', ')}`);
     }
     // If a context from CTX_CMT_ALLOWED_IN is in contexts, comment it as "allowed in"
-    let allowedIn = CTX_CMT_ALLOWED_IN.filter(context => contexts.includes(context));
+    let allowedIn = CTX_CMT_ALLOWED_IN.filter(context => contexts!.includes(context));
     if (allowedIn.length > 0) {
         lines.push(`Allowed in: ${allowedIn.map(ctx => CONTEXT_NAMES[ctx]).join(', ')}`);
     }
@@ -128,7 +125,6 @@ function* deepIteratePlainObjects(item: object): Iterable<object> {
 }
 
 export class Converter {
-
     out: string;
     readonly namespace_aliases: Indexable<string>;
     readonly schemaData: [string, NamespaceSchema[]][];
@@ -158,6 +154,7 @@ export class Converter {
         for (let data of this.schemaData) {
             // Enumerate the actual namespace data
             for (let namespace of data[1]) {
+                console.log(namespace.namespace, namespace.description);
                 // Check if we have an alias for it
                 if (this.namespace_aliases.hasOwnProperty(namespace.namespace)) {
                     namespace.namespace = this.namespace_aliases[namespace.namespace];
@@ -172,7 +169,7 @@ export class Converter {
                         properties: {},
                         functions: [],
                         events: [],
-                        description: '',
+                        description: namespace.description,
                         permissions: [],
                         allowedContexts: []
                     };
@@ -195,9 +192,6 @@ export class Converter {
                 if (namespace.events) {
                     resNamespace.events!.push(...namespace.events);
                 }
-                if (namespace.description) {
-                    resNamespace.description = namespace.description;
-                }
                 if (namespace.permissions) {
                     resNamespace.permissions!.push(...namespace.permissions);
                 }
@@ -206,7 +200,7 @@ export class Converter {
                 }
                 if (namespace.$import) {
                     resNamespace.$import = namespace.$import
-                };
+                }
             }
         }
     }
@@ -268,6 +262,27 @@ export class Converter {
 
     convertObjectProperties(type: TypeSchema) {
         let convertedProperties = [];
+
+        if (type.$import) {
+            const imp = _.find(this.namespaces[this.namespace].types, (x: TypeSchema) => {
+                // We need the split cause theme.json apparently has a "manifest.ManifestBase"
+                // despite being in the manifest namespace already
+                const imp = type.$import!.split('.')[0];
+                return x.id === imp || x.name == imp;
+            });
+            // Merge it, preferring type values not imp, and making sure we don't have dupes in arrays
+            _.mergeWith(type, imp, (objValue, srcValue, key) => {
+                if (_.isArray(objValue)) {
+                    return _.uniqWith(objValue.concat(srcValue), (arrVal, othVal) => {
+                        return (arrVal.id !== undefined && arrVal.id === othVal.id) || (arrVal.name !== undefined && arrVal.name === othVal.name);
+                    });
+                }
+                if (objValue !== undefined && !_.isObject(objValue)) {
+                    return objValue;
+                }
+            });
+        }
+
         // For each simple property
         if (type.properties) {
             for (let name of Object.keys(type.properties)) {
@@ -364,14 +379,16 @@ export class Converter {
             // If it's an enum
             // Make sure it has a proper id
             if (type.name && !type.id) type.id = type.name;
-            // We can only output enums in the namespace root (a schema enum, instead of e.g. a property having an enum as type)
+            // We can only output enums in the namespace root (a schema enum, instead of e.g. a property having an enum
+            // as type)
             if (root) {
                 // So if we are in the root
-                // Add each enum value, sanitizing the name (if it has one, otherwise just using its value as name)                
+                // Add each enum value, sanitizing the name (if it has one, otherwise just using its value as name)
+                //
                 const normalized = type.enum
                     .map(x => {
                         let comment: string;
-                        let value: string
+                        let value: string;
                         if (typeof x !== "string") {
                             comment = commentFromSchema(x);
                             value = x.name;
@@ -379,27 +396,26 @@ export class Converter {
                             comment = "";
                             value = x;
                         }
-                        const name = value.replace(/\W/g, '');
                         return {
                             comment,
                             value,
-                            name,
                         }
-                    })
-                    .filter(x => x.name);
-                out += `{\n${normalized.map(x => `${x.comment}${x.name} = "${x.value}"`).join(',\n')}\n}`
+                    });
+                out += `${normalized.length > 2 ? '\n' : ''}${normalized.map(x => `${x.comment} "${x.value}"`).join(`${normalized.length > 2 ? '\n' : ''}|`)}`
             } else {
                 if (type.id) {
                     const typeName = `_${this.convertName(type.id)}`;
-                    // If we're not in the root, add the enum as an additional type instead, adding an _ in front of the name
-                    // We convert the actual enum based on rules above by passing through the whole type code again, but this time as root
-                    this.additionalTypes.push(`${commentFromSchema(type)}const enum ${typeName} ${this.convertType(type, true)}`);
+                    // If we're not in the root, add the enum as an additional type instead, adding an _ in front of
+                    // the name We convert the actual enum based on rules above by passing through the whole type code
+                    // again, but this time as root
+                    // As per https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23002 don't use actual
+                    // typescript enums
+                    this.additionalTypes.push(`${commentFromSchema(type)}type ${typeName} = ${this.convertType(type, true)}`);
                     // And then just reference it by name in output
                     out += typeName;
                 } else {
                     // inline
-                    const typeStr = type.enum.map(x => `"${x}"`).join(" | ");
-                    out += typeStr;
+                    out += type.enum.map(x => `"${x}"`).join(" | ");
                 }
             }
         } else if (type.type) {
@@ -426,7 +442,8 @@ export class Converter {
                         if (type.isInstanceOf.toLowerCase() === 'window') {
                             out += type.isInstanceOf;
                         } else {
-                            // Otherwise it's some object we don't know about, therefore just treat it as a random object
+                            // Otherwise it's some object we don't know about, therefore just treat it as a random
+                            // object
                             out += `object/*${type.isInstanceOf}*/`;
                         }
                     } else {
@@ -434,7 +451,8 @@ export class Converter {
                         out += this.convertRef(type.isInstanceOf);
                     }
                 } else if (type.additionalProperties) {
-                    // If it has additional, but not normal properties, try converting those properties as a type, passing the parent name
+                    // If it has additional, but not normal properties, try converting those properties as a type,
+                    // passing the parent name
                     type.additionalProperties.id = type.id;
                     out += this.convertType(type.additionalProperties);
                 } else {
@@ -508,10 +526,39 @@ export class Converter {
         return Object.values(collapsedTypes);
     }
 
+    extendImportedTypes(types: TypeSchema[]) {
+        // For each type
+        for (let type of types) {
+            // If it has an import
+            if (type.$import) {
+                // Find what we're importing
+                const imp = _.find(types, (x: TypeSchema) => {
+                    // We need the split cause theme.json apparently has a "manifest.ManifestBase"
+                    // despite being in the manifest namespace already
+                    const imp = type.$import!.split('.')[0];
+                    return x.id === imp || x.name == imp;
+                });
+                // Merge it, preferring type values not imp, and making sure we don't have dupes in arrays
+                _.mergeWith(type, imp, (objValue, srcValue, key) => {
+                    if (_.isArray(objValue)) {
+                        return _.uniqWith(objValue.concat(srcValue), (arrVal, othVal) => {
+                            return (arrVal.id !== undefined && arrVal.id === othVal.id) || (arrVal.name !== undefined && arrVal.name === othVal.name);
+                        });
+                    }
+                    if (objValue !== undefined && !_.isObject(objValue)) {
+                        return objValue;
+                    }
+                });
+            }
+        }
+    }
+
     convertTypes(types: TypeSchema[] | undefined) {
         if (types === undefined) return [];
         // Collapse types that have an $extend in them
         types = this.collapseExtendedTypes(types);
+        // Extend types that have an $import in them
+        this.extendImportedTypes(types);
         let convertedTypes = [];
         // For each type
         for (let type of types) {
@@ -526,10 +573,13 @@ export class Converter {
             // Add converted source with proper keyword in front
             // This is here instead of in convertType, since that is also used for non root purposes
             if ((type.functions || type.events) || (type.type === 'object' && !type.isInstanceOf)) {
-                // If it has functions or events, or is an object that's not an instance of another one, it's an interface
+                // If it has functions or events, or is an object that's not an instance of another one, it's an
+                // interface
                 convertedTypes.push(`${comment}interface ${type.id} ${convertedType}`);
             } else if (type.enum) {
-                convertedTypes.push(`${comment}const enum ${this.convertName(type.id as string)} ${convertedType}`);
+                // As per https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23002 don't use actual
+                // typescript enums
+                convertedTypes.push(`${comment}type ${this.convertName(type.id as string)} = ${convertedType}`);
             } else {
                 // It's just a type of some kind
                 convertedTypes.push(`${comment}type ${type.id} = ${convertedType};`);
@@ -602,12 +652,13 @@ export class Converter {
                     // Since these files are originally chrome, some things are a bit weird
                     // Callbacks (which is what chrome uses) have no issues with returning multiple values
                     // but firefox uses promises, which AFAIK can't handle that
-                    // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in question yet
-                    // But since it's in the schemas, it's still a problem for us
-                    // TODO: Follow firefox developments in this area
+                    // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in
+                    // question yet But since it's in the schemas, it's still a problem for us TODO: Follow firefox
+                    // developments in this area
                     console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
                     // Just assume it's gonna be some kind of object that's returned from the promise
-                    // This seems like the most likely way the firefox team is going to make the promise return multiple values
+                    // This seems like the most likely way the firefox team is going to make the promise return
+                    // multiple values
                     parameters = ['object']
                 }
                 // Use void as return type if there were no parameters
@@ -617,7 +668,7 @@ export class Converter {
                 returnType = `Promise<${promiseReturn}>`;
                 // Because of namespace extends(?), a few functions can pass through here twice,
                 // so override the return type since the callback was removed and it can't be converted again
-                func.returns = { converterTypeOverride: returnType };
+                func.returns = {converterTypeOverride: returnType};
                 // Converted now
                 delete func.async;
             } else if (func.async && func.async !== 'callback') {
@@ -643,7 +694,7 @@ export class Converter {
         for (let [i, param] of (func.parameters || []).entries()) {
             if (isLeadingOptional(func.parameters!, i)) {
                 // It won't be optional in the overload signature, so create a copy of it marked as non-optional
-                leadingOptionals.push({ ...param, optional: false });
+                leadingOptionals.push({...param, optional: false});
             } else {
                 rest.push(param);
             }
@@ -711,7 +762,7 @@ export class Converter {
         // Therefore output multiple event choices where we one by one, strip the optional status
         // So we get an event that's '(one, two) | (two)' instead of '(one?, two)'
         for (let i = 0; i < parameters.length; i++) {
-            if (parameters[i].includes('?') && parameters.length > i + 1) {
+            if (parameters[i].endsWith('?') && parameters.length > i + 1) {
                 out += '\n| ' + this.convertSingleEvent(parameters.slice(i + 1), returnType, extra, event.name!);
             } else {
                 break;
@@ -844,5 +895,9 @@ export class Converter {
         const index = this.getIndex(namespace, section, id_or_name);
         const sectionObj = (this.namespaces[namespace] as any)[section];
         sectionObj[index] = edit(sectionObj[index]);
+    }
+
+    edit_path(path: [string, string, string] | string[], edit: (x: any) => any) {
+        this.edit(path[0], path[1], path[2], edit);
     }
 }

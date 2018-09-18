@@ -44,7 +44,6 @@ interface TypeSchema {
     items?: TypeSchema;
     value?: unknown;
     async?: true | "callback";
-
     converterTypeOverride?: string;
 }
 interface Indexable<V> {
