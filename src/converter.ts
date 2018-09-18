@@ -154,7 +154,6 @@ export class Converter {
         for (let data of this.schemaData) {
             // Enumerate the actual namespace data
             for (let namespace of data[1]) {
-                console.log(namespace.namespace, namespace.description);
                 // Check if we have an alias for it
                 if (this.namespace_aliases.hasOwnProperty(namespace.namespace)) {
                     namespace.namespace = this.namespace_aliases[namespace.namespace];
