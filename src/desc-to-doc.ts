@@ -1,6 +1,5 @@
 const toMarkdown = require('to-markdown');
-
-const URL = require("url");
+const validUrl = require('valid-url');
 
 function prefixLines(s: string, prefix: string) {
     let escapedReplacement = prefix.replace(/\$/g, '$$$$');
@@ -22,20 +21,11 @@ export function toDocComment(content: string) {
     return DOC_START + '\n' + prefixLines(content, DOC_CONT) + '\n' + DOC_END;
 }
 
-function isValidURL(url: string | null) {
-    try {
-        new URL(url);
-        return true;
-    } catch (_ignore) {
-        return false;
-    }
-}
-
 const toMarkdownOptions = {
     converters: [
         // un-linkify links to just fragment identifiers or relative urls meant for chrome docs pages
         {
-            filter: (element: HTMLElement) => (element.tagName === 'A') && !isValidURL(element.getAttribute('href')),
+            filter: (element: HTMLElement) => ((element.tagName === 'A') && !validUrl.is_web_uri(element.getAttribute('href'))),
             replacement: (content: string) => content,
         },
         // variable name
