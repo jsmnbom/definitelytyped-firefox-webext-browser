@@ -400,7 +400,7 @@ export class Converter {
                             value,
                         }
                     });
-                out += `${normalized.length > 2 ? '\n' : ''}${normalized.map(x => `${x.comment} "${x.value}"`).join(`${normalized.length > 2 ? '\n' : ''}|`)}`
+                out += `${normalized.length > 2 ? '\n' : ''}${normalized.map(x => `${x.comment} "${x.value}"`).join(`${normalized.length > 2 ? '\n' : ''}|`)};`
             } else {
                 if (type.id) {
                     const typeName = `_${this.convertName(type.id)}`;
