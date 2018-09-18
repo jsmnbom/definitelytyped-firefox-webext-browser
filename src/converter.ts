@@ -382,25 +382,31 @@ export class Converter {
             // as type)
             if (root) {
                 // So if we are in the root
-                // Add each enum value, sanitizing the name (if it has one, otherwise just using its value as name)
-                //
+                // Add each enum value, and format its comment
                 const normalized = type.enum
                     .map(x => {
-                        let comment: string;
-                        let value: string;
                         if (typeof x !== "string") {
-                            comment = commentFromSchema(x);
-                            value = x.name;
-                        } else {
-                            comment = "";
-                            value = x;
+                            return {
+                                comment: commentFromSchema(x),
+                                value: x.name
+                            };
                         }
                         return {
-                            comment,
-                            value,
-                        }
+                            comment: "",
+                            value: x
+                        };
                     });
-                out += `${normalized.length > 2 ? '\n' : ''}${normalized.map(x => `${x.comment} "${x.value}"`).join(`${normalized.length > 2 ? '\n' : ''}|`)};`
+                // Should it be output across multiple lines?
+                // Yes if either more than 2 elements or we got multiple lines already
+                const multiline = normalized.length > 2 || normalized.some(x => x.comment.includes('\n'));
+                if (multiline) out += '\n';
+                // For each entry, join using | adding newlines as needed
+                for (const [i, x] of normalized.entries()) {
+                    out += x.comment;
+                    out += i > 0 ? `|` : '';
+                    out += `"${x.value}"${multiline && i !== normalized.length - 1 ? '\n' : ''}`
+                }
+                out += ';';
             } else {
                 if (type.id) {
                     const typeName = `_${this.convertName(type.id)}`;
