@@ -1,16 +1,16 @@
 /*
-Requires firefox source code to be downloaded, which can be found at https://archive.mozilla.org/pub/firefox/releases/ in the source subdirectory
-Install node modules using
-    npm install
-Build with
-    tsc -p .
-Use as:
-    node build/index.js -f <FIREFOX VERSION> -s <SCHEMAS1> -s <SCHEMAS2> -o <OUTPUT_FILE>
-Where SCHEMAS are toolkit/components/extensions/schemas and
-browser/components/extensions/schemas inside the firefox source directory.
-For example:
-    node index.js -f 63.0 -s firefox-63.0b6/toolkit/components/extensions/schemas -s firefox-63.0b6/browser/components/extensions/schemas -o index.d.ts
-*/
+ Requires firefox source code to be downloaded, which can be found at https://archive.mozilla.org/pub/firefox/releases/ in the source subdirectory
+ Install node modules using
+ $ npm install
+ Build with
+ $ tsc -p .
+ Use as:
+ $ node build/index.js -f <FIREFOX VERSION> -s <SCHEMAS1> -s <SCHEMAS2> -o <OUTPUT_FILE>
+ Where SCHEMAS are toolkit/components/extensions/schemas and
+ browser/components/extensions/schemas inside the firefox source directory.
+ For example:
+ $ node index.js -f 63.0 -s firefox-63.0b6/toolkit/components/extensions/schemas -s firefox-63.0b6/browser/components/extensions/schemas -o index.d.ts
+ */
 
 "use strict";
 
@@ -21,7 +21,7 @@ const argv = require("minimist")(process.argv.slice(2), {
 import {Converter} from "./converter";
 
 // Namespace references that need renaming
-const NAMESPACE_ALIASES = { 'contextMenusInternal': 'menusInternal', 'manifest': '_manifest' };
+const NAMESPACE_ALIASES = {'contextMenusInternal': 'menusInternal', 'manifest': '_manifest'};
 
 // Header of the definitions file
 const HEADER = `// Type definitions for WebExtension Development in FireFox ${argv['f']}
@@ -53,7 +53,7 @@ converter.setUnsupportedAsOptional();
 converter.removeNamespace('test');
 // browser.runtime.getManifest should return WebExtensionManifest
 converter.edit('runtime', 'functions', 'getManifest', x => {
-    x.returns = { '$ref': 'manifest.WebExtensionManifest' };
+    x.returns = {'$ref': 'manifest.WebExtensionManifest'};
     return x;
 });
 // Fix dupe _NativeManifestType
@@ -118,7 +118,7 @@ converter.edit('webRequest', 'events', 'onAuthRequired', x => {
     return x;
 });
 // Fix the lack of promise return in functions that firefox has but chrome doesn't
-for (let [namespace, funcs] of <Array<[string, Array<[string, boolean|string]>]>> [
+for (let [namespace, funcs] of <Array<[string, Array<[string, boolean | string]>]>> [
     ['clipboard', [['setImageData', 'void']]],
     ['contextualIdentities', [
         ['create', 'ContextualIdentity'],
@@ -144,7 +144,8 @@ for (let [namespace, funcs] of <Array<[string, Array<[string, boolean|string]>]>
     ]],
     ['pageAction', [
         ['setPopup', false],
-        ['openPopup', 'void']
+        ['openPopup', 'void'],
+        ['isShown', 'boolean']
     ]],
     ['pkcs11', [
         ['getModuleSlots', '{\nname: string;\ntoken?: {\nname: string;\nmanufacturer: string;\nHWVersion: string;\nFWVersion: string;\nserial: string;\nisLoggedIn: string;\n};\n}'],
@@ -171,20 +172,38 @@ for (let [namespace, funcs] of <Array<[string, Array<[string, boolean|string]>]>
         ['setIcon', 'void'],
         ['setTitle', 'void'],
         ['getPanel', 'string'],
-        ['getTitle', 'string']
+        ['getTitle', 'string'],
+        ['isOpen', 'boolean']
     ]],
     ['tabs', [
         ['discard', 'void'],
         ['toggleReaderMode', 'void'],
         ['show', 'void'],
-        ['hide', 'number[]']
+        ['hide', 'number[]'],
+        ['captureTab', 'string']
+    ]],
+    ['dns', [
+        ['resolve', 'DNSRecord']
+    ]],
+    ['contentScripts', [
+        ['register', 'RegisteredContentScript']
+    ]],
+    ['webRequest', [
+        ['getSecurityInfo', 'SecurityInfo']
+    ]],
+    ['commands', [
+        ['update', 'void'],
+        ['reset', 'void']
+    ]],
+    ['search', [
+        ['get', 'SearchEngine[]']
     ]]
 ]) {
     for (let [name, ret] of funcs) converter.edit(namespace, 'functions', name, x => {
         if (ret) {
-            x.returns = { converterTypeOverride: `Promise<${ret}>` };
+            x.returns = {converterTypeOverride: `Promise<${ret}>`};
         } else {
-            x.returns = { converterTypeOverride: 'void' };
+            x.returns = {converterTypeOverride: 'void'};
         }
         return x;
     });
