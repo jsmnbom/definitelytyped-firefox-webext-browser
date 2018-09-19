@@ -1,15 +1,9 @@
-/*
- Requires firefox source code to be downloaded, which can be found at https://archive.mozilla.org/pub/firefox/releases/ in the source subdirectory
- Install node modules using
- $ npm install
- Build with
- $ tsc -p .
- Use as:
- $ node build/index.js -f <FIREFOX VERSION> -s <SCHEMAS1> -s <SCHEMAS2> -o <OUTPUT_FILE>
- Where SCHEMAS are toolkit/components/extensions/schemas and
- browser/components/extensions/schemas inside the firefox source directory.
- For example:
- $ node index.js -f 63.0 -s firefox-63.0b6/toolkit/components/extensions/schemas -s firefox-63.0b6/browser/components/extensions/schemas -o index.d.ts
+/**
+ * Generates typescript definitions for webextension development in firefox.
+ *
+ * See ../README.md for usage.
+ *
+ * @author Jasmin Bom.
  */
 
 "use strict";
