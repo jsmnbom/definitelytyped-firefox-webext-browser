@@ -64,3 +64,5 @@ typings/
 .vscode/
 
 build/
+
+firefox/
