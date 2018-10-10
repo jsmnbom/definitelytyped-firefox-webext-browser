@@ -775,7 +775,9 @@ export class Converter {
         }
         parameters = parameters.map((x, i) => {
             if (parameters.length > 0 && i < parameters.length - 1) {
-                return x.replace('?', '');
+                // Remove the optional ?
+                // Do not remove a ? if it's part of an object definition (which spans multiple lines)
+                return x.replace(/\?(?![\s\S]*\n)/, '');
             }
             return x;
         });
