@@ -226,6 +226,19 @@ converter.edit('runtime', 'types', 'Port', Port => {
     Port.properties.postMessage.parameters = [{type: "object", name: "message"}];
     return Port
 });
+// Type alias can't reference themselves
+// See https://github.com/Microsoft/TypeScript/issues/6230
+converter.edit('extensionTypes', 'types', 'PlainJSONValue', PlainJSONValue => {
+    PlainJSONValue.choices = [
+        {type:"null"},
+        {type:"string"},
+        {type:"number"},
+        {type:"boolean"},
+        {id:"_PlainJSONArray", converterAdditionalType: 'interface _PlainJSONArray extends Array<PlainJSONValue> {}'},
+        {id:"_PlainJSONObject", converterAdditionalType: 'interface _PlainJSONObject {[key: string]: PlainJSONValue;}'}
+    ];
+    return PlainJSONValue;
+});
 
 converter.convert();
 converter.write(argv['o']);

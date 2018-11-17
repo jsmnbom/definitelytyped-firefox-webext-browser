@@ -344,6 +344,10 @@ export class Converter {
         if (type.converterTypeOverride) {
             return type.converterTypeOverride;
         }
+        if (type.converterAdditionalType && type.id) {
+            this.additionalTypes.push(type.converterAdditionalType);
+            return type.id;
+        }
         let out = '';
         // Check type of type
         if (type.choices) {
@@ -366,7 +370,7 @@ export class Converter {
             // For each choice, convert according to rules, join via a pipe "|" and add to output
             out += _.uniqWith(choices.map(x => {
                 // Override id with parent id for proper naming
-                x.id = type.id;
+                //x.id = type.id;
                 // Convert it as a type
                 let y = this.convertType(x);
                 // If it's any, make it object instead and hope that works
