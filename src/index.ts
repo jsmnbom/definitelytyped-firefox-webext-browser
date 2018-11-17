@@ -191,6 +191,9 @@ for (let [namespace, funcs] of <Array<[string, Array<[string, boolean | string]>
     ]],
     ['search', [
         ['get', 'SearchEngine[]']
+    ]],
+    ['userScripts', [
+        ['register', 'RegisteredUserScript']
     ]]
 ]) {
     for (let [name, ret] of funcs) converter.edit(namespace, 'functions', name, x => {
@@ -230,14 +233,22 @@ converter.edit('runtime', 'types', 'Port', Port => {
 // See https://github.com/Microsoft/TypeScript/issues/6230
 converter.edit('extensionTypes', 'types', 'PlainJSONValue', PlainJSONValue => {
     PlainJSONValue.choices = [
-        {type:"null"},
-        {type:"string"},
-        {type:"number"},
-        {type:"boolean"},
-        {id:"_PlainJSONArray", converterAdditionalType: 'interface _PlainJSONArray extends Array<PlainJSONValue> {}'},
-        {id:"_PlainJSONObject", converterAdditionalType: 'interface _PlainJSONObject {[key: string]: PlainJSONValue;}'}
+        {type: "null"},
+        {type: "string"},
+        {type: "number"},
+        {type: "boolean"},
+        {id: "_PlainJSONArray", converterAdditionalType: 'interface _PlainJSONArray extends Array<PlainJSONValue> {}'},
+        {id: "_PlainJSONObject", converterAdditionalType: 'interface _PlainJSONObject {[key: string]: PlainJSONValue;}'}
     ];
     return PlainJSONValue;
+});
+// ExportedAPIMethods have weird schema
+converter.edit('userScripts', 'types', 'ExportedAPIMethods', ExportedAPIMethods => {
+    ExportedAPIMethods.additionalProperties = undefined;
+    ExportedAPIMethods.patternProperties = {
+        'string': {converterTypeOverride: '(...args: any[]) => any'}
+    };
+    return ExportedAPIMethods;
 });
 
 converter.convert();
