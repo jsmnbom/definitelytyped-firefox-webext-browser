@@ -37,3 +37,8 @@ $ node build/index.js -f 63.0 -s firefox/63.0b6/toolkit/components/extensions/sc
 
 And place the generated index.d.ts in [DefinitelyTyped/DefinitelyTyped/types/firefox-webext-browser](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/firefox-webext-browser).
 
+Note that for sending PRs to DefinitelyTyped you need to include why you changed. For simple updates (FF version 
+changes), this can be easily generated and uploaded to gist using for example:
+```console
+diff -uNr firefox/63.0b6 firefox/64.0b10 | gist -p -d "Diff of {toolkit,browser}/components/extensions/schemas/*.* in firefox source code, from version 63.0b6 to 64.0b10. Downloaded from https://hg.mozilla.org/mozilla-unified/summary." -f "63.0b6-to-64.0b10.diff"
+```
