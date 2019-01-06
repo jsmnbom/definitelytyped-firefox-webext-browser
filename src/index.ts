@@ -242,14 +242,6 @@ converter.edit('extensionTypes', 'types', 'PlainJSONValue', PlainJSONValue => {
     ];
     return PlainJSONValue;
 });
-// ExportedAPIMethods have weird schema
-converter.edit('userScripts', 'types', 'ExportedAPIMethods', ExportedAPIMethods => {
-    ExportedAPIMethods.additionalProperties = undefined;
-    ExportedAPIMethods.patternProperties = {
-        'string': {converterTypeOverride: '(...args: any[]) => any'}
-    };
-    return ExportedAPIMethods;
-});
 
 converter.convert();
 converter.write(argv['o']);
