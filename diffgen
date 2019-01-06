@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+
+FROM=$1
+TO=$2
+
+diff -uNr firefox/$FROM firefox/$TO | gist -f "$FROM-to-$TO.diff" -p -d "Diff of {toolkit,browser}/components/extensions/schemas/*.* in firefox source code, from version $FROM to $TO. Downloaded from https://hg.mozilla.org/mozilla-unified/summary."
