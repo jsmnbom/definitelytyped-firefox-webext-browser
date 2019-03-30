@@ -25,13 +25,11 @@ const HEADER = `// Type definitions for WebExtension Development in FireFox ${ar
 // TypeScript Version: 2.9
 // Generated using script at github.com/jsmnbom/definitelytyped-firefox-webext-browser
 
-interface WebExtEventBase<TAddListener extends (...args: any[]) => any, TCallback> {
-    addListener: TAddListener;
+interface WebExtEvent<TCallback extends (...args: any[]) => any> {
+    addListener(cb: TCallback): void;
     removeListener(cb: TCallback): void;
     hasListener(cb: TCallback): boolean;
 }
-
-type WebExtEvent<TCallback extends (...args: any[]) => any> = WebExtEventBase<(callback: TCallback) => void, TCallback>;
 
 interface Window {
     browser: typeof browser;
@@ -81,7 +79,7 @@ for (let path of test) converter.edit_path(path, x => {
     return x;
 });
 // Fix webrequest events
-for (let path of <string[][]> [
+for (let path of <string[][]>[
     ['webRequest', 'events', 'onAuthRequired'],
     ['webRequest', 'events', 'onBeforeRequest'],
     ['webRequest', 'events', 'onBeforeSendHeaders'],
@@ -94,7 +92,7 @@ for (let path of <string[][]> [
     return x;
 });
 // Fix webrequest events
-for (let path of <string[][]> [
+for (let path of <string[][]>[
     ['webRequest', 'events', 'onAuthRequired'],
     ['webRequest', 'events', 'onBeforeRequest'],
     ['webRequest', 'events', 'onBeforeSendHeaders'],
@@ -112,7 +110,7 @@ converter.edit('webRequest', 'events', 'onAuthRequired', x => {
     return x;
 });
 // Fix the lack of promise return in functions that firefox has but chrome doesn't
-for (let [namespace, funcs] of <Array<[string, Array<[string, boolean | string]>]>> [
+for (let [namespace, funcs] of <Array<[string, Array<[string, boolean | string]>]>>[
     ['clipboard', [['setImageData', 'void']]],
     ['contextualIdentities', [
         ['create', 'ContextualIdentity'],
@@ -241,6 +239,15 @@ converter.edit('extensionTypes', 'types', 'PlainJSONValue', PlainJSONValue => {
         {id: "_PlainJSONObject", converterAdditionalType: 'interface _PlainJSONObject {[key: string]: PlainJSONValue;}'}
     ];
     return PlainJSONValue;
+});
+// Fix error return type in some proxy events
+converter.edit('proxy', 'events', 'onError', (onError) => {
+    onError.parameters[0].converterTypeOverride= 'Error';
+    return onError;
+});
+converter.edit('proxy', 'events', 'onProxyError', (onProxyError) => {
+    onProxyError.parameters[0].converterTypeOverride= 'Error';
+    return onProxyError;
 });
 
 converter.convert();

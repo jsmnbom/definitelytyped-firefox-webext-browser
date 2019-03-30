@@ -740,7 +740,12 @@ export class Converter {
         if (extra) {
             // It has extra parameters, so output custom event handler
             let listenerName = '_' + this.convertName(`${this.namespace}_${name}_Event`);
-            this.additionalTypes.push(`type ${listenerName}<T = (${parameters.join(', ')}) => ${returnType}> = WebExtEventBase<(callback: T, ${extra.join(', ')}) => void, T>;`);
+            this.additionalTypes.push(`interface ${listenerName}<TCallback = (${parameters.join(', ')}) => ${returnType}> {
+    addListener(cb: TCallback, ${extra.join(', ')}): void;
+    removeListener(cb: TCallback): void;
+    hasListener(cb: TCallback): boolean;
+}`);
+            //this.additionalTypes.push(`type ${listenerName}<T =`);
             return `${listenerName}`;
         } else {
             // It has no extra parameters, so just use the helper that we define in HEADER
