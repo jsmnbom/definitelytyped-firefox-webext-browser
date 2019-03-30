@@ -225,6 +225,8 @@ converter.remove('bookmarks', 'events', 'onImportEnded');
 // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23542
 converter.edit('runtime', 'types', 'Port', Port => {
     Port.properties.postMessage.parameters = [{type: "object", name: "message"}];
+    Port.properties.onDisconnect = {converterTypeOverride: 'WebExtEvent<() => void>'};
+    Port.properties.onMessage = {converterTypeOverride: 'WebExtEvent<() => void>'};
     return Port
 });
 // Type alias can't reference themselves
