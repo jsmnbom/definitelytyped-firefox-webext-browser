@@ -18,7 +18,7 @@ import {Converter} from "./converter";
 const NAMESPACE_ALIASES = {'contextMenusInternal': 'menusInternal', 'manifest': '_manifest'};
 
 // Header of the definitions file
-const HEADER = `// Type definitions for WebExtension Development in FireFox ${argv['f']}
+const HEADER = `// Type definitions for non-npm package WebExtension Development in FireFox ${argv['f']}
 // Project: https://developer.mozilla.org/en-US/Add-ons/WebExtensions
 // Definitions by: Jasmin Bom <https://github.com/jsmnbom>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
