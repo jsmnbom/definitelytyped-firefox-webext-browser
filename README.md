@@ -6,7 +6,7 @@ See the output at: [DefinitelyTyped/DefinitelyTyped/types/firefox-webext-browser
 
 Install definitions using `npm install @types/firefox-webext-browser`.
 
-**Currently based on `FIREFOX_65_0b8_RELEASE`.**
+**Currently based on `FIREFOX_67_0b7_RELEASE`.**
 
 ## Usage
 *You should only need to do this if you wanna update the definitions, to just use them, see the npm install line above.*
