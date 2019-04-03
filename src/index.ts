@@ -251,6 +251,12 @@ converter.edit('proxy', 'events', 'onProxyError', (onProxyError) => {
     onProxyError.parameters[0].converterTypeOverride= 'Error';
     return onProxyError;
 });
+converter.edit('_manifest', 'types', 'PersistentBackgroundProperty', (PersistentBackgroundProperty) => {
+    PersistentBackgroundProperty.type = 'boolean';
+    PersistentBackgroundProperty.deprecated = PersistentBackgroundProperty.choices[1].deprecated;
+    delete PersistentBackgroundProperty.choices;
+    return PersistentBackgroundProperty
+});
 
 converter.convert();
 converter.write(argv['o']);
