@@ -225,8 +225,26 @@ converter.remove('bookmarks', 'events', 'onImportEnded');
 // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23542
 converter.edit('runtime', 'types', 'Port', Port => {
     Port.properties.postMessage.parameters = [{type: "object", name: "message"}];
-    Port.properties.onDisconnect = {converterTypeOverride: 'WebExtEvent<() => void>'};
-    Port.properties.onMessage = {converterTypeOverride: 'WebExtEvent<() => void>'};
+    Port.properties.error = {converterTypeOverride: 'Error', optional: true};
+    Port.events = [
+        {
+            name: 'onMessage',
+            type: 'function',
+            parameters: [
+                {type: 'object', name: 'response'}
+            ]
+        },
+        {
+            name: 'onDisconnect',
+            type: 'function',
+            parameters: [
+                {"$ref": 'Port', name: 'port'}
+            ]
+        }
+    ];
+    delete Port.properties.onDisconnect;
+    delete Port.properties.onMessage;
+
     return Port
 });
 // Type alias can't reference themselves
@@ -244,11 +262,11 @@ converter.edit('extensionTypes', 'types', 'PlainJSONValue', PlainJSONValue => {
 });
 // Fix error return type in some proxy events
 converter.edit('proxy', 'events', 'onError', (onError) => {
-    onError.parameters[0].converterTypeOverride= 'Error';
+    onError.parameters[0].converterTypeOverride = 'Error';
     return onError;
 });
 converter.edit('proxy', 'events', 'onProxyError', (onProxyError) => {
-    onProxyError.parameters[0].converterTypeOverride= 'Error';
+    onProxyError.parameters[0].converterTypeOverride = 'Error';
     return onProxyError;
 });
 converter.edit('_manifest', 'types', 'PersistentBackgroundProperty', (PersistentBackgroundProperty) => {
