@@ -463,7 +463,7 @@ export class Converter {
                     // If it has additional, but not normal properties, try converting those properties as a type,
                     // passing the parent name
                     type.additionalProperties.id = type.id;
-                    out += this.convertType(type.additionalProperties);
+                    out += `{[key: string]: ${this.convertType(type.additionalProperties)}}`;
                 } else {
                     // Okay so it's just some kind of object, right?...
                     out += 'object';
