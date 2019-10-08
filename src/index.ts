@@ -192,6 +192,13 @@ for (let [namespace, funcs] of <Array<[string, Array<[string, boolean | string]>
     ]],
     ['userScripts', [
         ['register', 'RegisteredUserScript']
+    ]],
+    ['captivePortal', [
+        ['getState', '_UndefinedState'],
+        ['getLastChecked', 'Number']
+    ]],
+    ['networkStatus', [
+        ['getLinkInfo', 'NetworkLinkInfo']
     ]]
 ]) {
     for (let [name, ret] of funcs) converter.edit(namespace, 'functions', name, x => {
