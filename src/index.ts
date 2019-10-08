@@ -195,7 +195,7 @@ for (let [namespace, funcs] of <Array<[string, Array<[string, boolean | string]>
     ]],
     ['captivePortal', [
         ['getState', '_UndefinedState'],
-        ['getLastChecked', 'Number']
+        ['getLastChecked', 'number']
     ]],
     ['networkStatus', [
         ['getLinkInfo', 'NetworkLinkInfo']
