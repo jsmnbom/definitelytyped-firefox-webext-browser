@@ -16,7 +16,7 @@
         "@types/minimist": "^1.2.0",
         "@types/node": "8.*",
         "@types/strip-json-comments": "^0.0.30",
-        "lodash": "^4.17.10",
+        "lodash": "^4.17.13",
         "minimist": "^1.2.0",
         "strip-json-comments": "^2.0.1",
         "tar": "^4.4.6",
