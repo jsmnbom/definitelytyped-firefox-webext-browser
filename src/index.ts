@@ -217,11 +217,6 @@ converter.edit('events', 'types', 'Event', x => {
     }
     return x;
 });
-// This should prob also not return promise
-converter.edit('devtools.panels', 'types', 'ElementsPanel', x => {
-    x.functions[0].async = false;
-    return x;
-});
 // Remove bookmarks.import and bookmarks.export as it breaks things
 // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/24937
 converter.remove('bookmarks', 'functions', 'import');

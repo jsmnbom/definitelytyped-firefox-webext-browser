@@ -647,6 +647,13 @@ export class Converter {
         let returnType: string | TypeSchema = 'void';
         // Prove otherwise? either a normal returns or as an async promise
         if (func.returns) {
+            // First check if it has a callbackc and a return value
+            // If it does it's probably cause we overwrote the return value in index.ts and we need to remove the
+            // callback parameter anyways
+            let callback = func.parameters && func.parameters.find(x => x.type === 'function' && x.name === func.async);
+            if (callback) {
+                func.parameters = func.parameters!.filter(x => x !== callback);
+            }
             returnType = this.convertType(func.returns);
             if (func.returns.optional && !ALREADY_OPTIONAL_RETURNS.includes(returnType)) returnType += ' | void';
         } else {
@@ -673,7 +680,11 @@ export class Converter {
                 // Use void as return type if there were no parameters
                 // Note that the join is kinda useless (see long comments above)
                 let promiseReturn = parameters[0] || 'void';
-                if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | undefined';
+
+                // https://github.com/jsmnbom/definitelytyped-firefox-webext-browser/issues/21
+                //if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' |
+                // undefined';
+
                 returnType = `Promise<${promiseReturn}>`;
                 // Because of namespace extends(?), a few functions can pass through here twice,
                 // so override the return type since the callback was removed and it can't be converted again
