@@ -277,6 +277,12 @@ converter.edit('_manifest', 'types', 'PersistentBackgroundProperty', (Persistent
     delete PersistentBackgroundProperty.choices;
     return PersistentBackgroundProperty
 });
+converter.edit('permissions', 'functions', 'remove', remove => {
+    remove.parameters[1].parameters = [{
+        "type": "boolean"
+    }];
+    return remove
+});
 
 converter.convert();
 converter.write(argv['o']);
