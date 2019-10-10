@@ -673,7 +673,11 @@ export class Converter {
                 // Use void as return type if there were no parameters
                 // Note that the join is kinda useless (see long comments above)
                 let promiseReturn = parameters[0] || 'void';
-                if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' | undefined';
+
+                // https://github.com/jsmnbom/definitelytyped-firefox-webext-browser/issues/21
+                //if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' |
+                // undefined';
+
                 returnType = `Promise<${promiseReturn}>`;
                 // Because of namespace extends(?), a few functions can pass through here twice,
                 // so override the return type since the callback was removed and it can't be converted again
