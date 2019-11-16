@@ -16,12 +16,13 @@
         "@types/minimist": "^1.2.0",
         "@types/node": "8.*",
         "@types/strip-json-comments": "^0.0.30",
+        "@types/unzipper": "^0.10.1",
         "lodash": "^4.17.13",
         "minimist": "^1.2.0",
         "strip-json-comments": "^2.0.1",
-        "tar": "^4.4.6",
         "to-markdown": "^3.1.1",
         "typescript": "^3.0.1",
+        "unzipper": "^0.10.5",
         "valid-url": "^1.0.9"
     },
     "defDependencies": {}
