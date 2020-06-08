@@ -919,8 +919,12 @@ export class Converter {
     }
 
     edit(namespace: string, section: string, id_or_name: string, edit: (x: any) => any) {
+        console.log(`Editing ${namespace}.${section}.${id_or_name}`);
         const index = this.getIndex(namespace, section, id_or_name);
         const sectionObj = (this.namespaces[namespace] as any)[section];
+        if (sectionObj[index] === undefined || sectionObj[index] === null) {
+            console.warn('WARNING: Is either undefined or null!');
+        }
         sectionObj[index] = edit(sectionObj[index]);
     }
 

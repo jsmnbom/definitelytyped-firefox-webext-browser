@@ -21,7 +21,7 @@ import {Converter} from "./converter";
 const NAMESPACE_ALIASES = {'contextMenusInternal': 'menusInternal', 'manifest': '_manifest'};
 
 // Header of the definitions file
-const HEADER = `// Type definitions for non-npm package WebExtension Development in FireFox ${argv['f']}
+const HEADER = `// Type definitions for non-npm package WebExtension Development in FireFox ${argv['firefox_version']}
 // Project: https://developer.mozilla.org/en-US/Add-ons/WebExtensions
 // Definitions by: Jasmin Bom <https://github.com/jsmnbom>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
@@ -122,16 +122,15 @@ for (let [namespace, funcs] of <Array<[string, Array<[string, boolean | string]>
         ['remove', 'ContextualIdentity'],
         ['update', 'ContextualIdentity']
     ]],
-    ['proxy', [
-        ['register', 'void'],
-        ['unregister', 'void']
-    ]],
     ['theme', [
         ['getCurrent', '_manifest.ThemeType'],
         ['reset', false],
         ['update', false]
     ]],
-    ['browserAction', [['openPopup', 'void']]],
+    ['browserAction', [
+        ['openPopup', 'void'],
+        ['openPopup', 'boolean'],
+    ]],
     ['find', [
         ['find', '{\ncount: number;\nrangeData?: Array<{\nframePos: number;\nstartTextNodePos: number;\nendTextNodePos: number;\nstartOffset: number;\nendOffset: number;\n}>;\nrectData?: Array<{\nrectsAndTexts: {\nrectList: Array<{\ntop: number;\nleft: number;\nbottom: number;\nright: number;\n}>;\ntextList: string[];\n};\ntextList: string;\n}>;\n}'],
         ['highlightResults', false],
@@ -168,6 +167,7 @@ for (let [namespace, funcs] of <Array<[string, Array<[string, boolean | string]>
         ['setTitle', 'void'],
         ['getPanel', 'string'],
         ['getTitle', 'string'],
+        ['toggle', 'void'],
         ['isOpen', 'boolean']
     ]],
     ['tabs', [
@@ -270,10 +270,6 @@ converter.edit('proxy', 'events', 'onError', (onError) => {
     onError.parameters[0].converterTypeOverride = 'Error';
     return onError;
 });
-converter.edit('proxy', 'events', 'onProxyError', (onProxyError) => {
-    onProxyError.parameters[0].converterTypeOverride = 'Error';
-    return onProxyError;
-});
 converter.edit('_manifest', 'types', 'PersistentBackgroundProperty', (PersistentBackgroundProperty) => {
     PersistentBackgroundProperty.type = 'boolean';
     PersistentBackgroundProperty.deprecated = PersistentBackgroundProperty.choices[1].deprecated;
@@ -288,6 +284,6 @@ converter.edit('permissions', 'functions', 'remove', remove => {
 });
 
 converter.convert();
-converter.write(argv['o']);
+converter.write(argv['out']);
 
 
