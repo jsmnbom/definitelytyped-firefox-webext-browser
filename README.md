@@ -38,7 +38,8 @@ $ node build/index.js -version 63.0 -out index.d.ts schemas/FIREFOX_63_0b6_RELEA
 And place the generated index.d.ts in [DefinitelyTyped/DefinitelyTyped/types/firefox-webext-browser](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/firefox-webext-browser).
 
 Note that for sending PRs to DefinitelyTyped you need to include why you changed. For simple updates (FF version 
-changes), this can be easily generated and uploaded to gist using for example:
+changes), this can be easily generated and uploaded to gist using the included script (requires the gist tool and 
+that you are logged in):
 ```console
-diff -uNr firefox/63.0b6 firefox/64.0b10 | gist -p -d "Diff of {toolkit,browser}/components/extensions/schemas/*.* in firefox source code, from version 63.0b6 to 64.0b10. Downloaded from https://hg.mozilla.org/mozilla-unified/summary." -f "63.0b6-to-64.0b10.diff"
+diffgen FIREFOX_63_0b6_RELEASE FIREFOX_64_0b1_RELEASE
 ```
