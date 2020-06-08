@@ -8,8 +8,11 @@
 
 "use strict";
 
-const argv = require("minimist")(process.argv.slice(2), {
-    string: ['f']
+import minimist from 'minimist';
+
+const argv = minimist(process.argv.slice(2), {
+    string: ['firefox_version', 'out'],
+    alias: {v: 'firefox_version', version: 'firefox_version',  o: 'out'}
 });
 
 import {Converter} from "./converter";
@@ -37,7 +40,7 @@ interface Window {
 
 `;
 
-let converter = new Converter(Array.isArray(argv['s']) ? argv['s'] : new Array(argv['s']), HEADER, NAMESPACE_ALIASES);
+let converter = new Converter(argv['_'], HEADER, NAMESPACE_ALIASES);
 converter.setUnsupportedAsOptional();
 
 /* Customizations */

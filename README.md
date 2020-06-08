@@ -25,14 +25,14 @@ $ npm run watch
 Download proper firefox sources to firefox/VERISION.
 See https://hg.mozilla.org/mozilla-unified/tags for available tags.
 ```console
-$ node build/download.js -t <TAG> -v <VERSION> -o <OUTDIR>
-$ node build/download.js -t FIREFOX_63_0b6_RELEASE -v 63.0b6 -o firefox
+$ node build/download.js -tag <TAG> -v <VERSION> -out <OUTDIR>
+$ node build/download.js -tag FIREFOX_63_0b6_RELEASE -out schemas
 ```
 
 Then actually generate definitions
 ```console
-$ node build/index.js -f <FIREFOX VERSION> -s <SCHEMAS1> -s <SCHEMAS2> -o <OUTPUT_FILE>
-$ node build/index.js -f 63.0 -s firefox/63.0b6/toolkit/components/extensions/schemas -s firefox/63.0b6/browser/components/extensions/schemas -o index.d.ts
+$ node build/index.js -version <FIREFOX VERSION> -out <OUTPUT_FILE> [SCHEMA_FOLDER]...
+$ node build/index.js -version 63.0 -out index.d.ts schemas/FIREFOX_63_0b6_RELEASE/{browser,toolkit}
 ```
 
 And place the generated index.d.ts in [DefinitelyTyped/DefinitelyTyped/types/firefox-webext-browser](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/firefox-webext-browser).

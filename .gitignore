@@ -63,6 +63,9 @@ typings/
 # Visual Studio Code
 .vscode/
 
+# Built code from tsc
 build/
 
+# Suggested folders to put schema files in
 firefox/
+schemas/
