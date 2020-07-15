@@ -18,7 +18,7 @@
         "@types/request": "^2.48.5",
         "@types/unzipper": "^0.10.3",
         "fstream": "^1.0.12",
-        "lodash": "^4.17.15",
+        "lodash": "^4.17.19",
         "minimist": "^1.2.5",
         "strip-json-comments": "^3.1.0",
         "to-markdown": "^3.1.1",
