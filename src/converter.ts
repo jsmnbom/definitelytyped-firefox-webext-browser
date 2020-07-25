@@ -68,7 +68,10 @@ const CTX_CMT_NOT_ALLOWED_IN = ['content', 'devtools'];
 const CTX_CMT_ALLOWED_IN = ['proxy'];
 
 function pascalCase(s: string): string {
-    return s.split('_').map(x => x.charAt(0).toUpperCase() + x.slice(1)).join('');
+  return s
+    .split('_')
+    .map((x) => x.charAt(0).toUpperCase() + x.slice(1))
+    .join('');
 }
 
 // Formats an allowedContexts array to a readable string
@@ -495,7 +498,16 @@ export default class Converter {
           let properties = this.convertObjectProperties(type);
           // If it has no properties, just say it's some type of object
           if (properties.length > 0) {
-            out += `{\n${properties.join(';\n')};\n}`;
+            if (type.id && !root) {
+              const typeName = `_${pascalCase(type.id!)}`;
+              this.additionalTypes.push(
+                `${commentFromSchema(type)}interface ${typeName} {\n${properties.join(';\n')};\n}`
+              );
+              // And then just reference it by name in output
+              out += typeName;
+            } else {
+              out += `{\n${properties.join(';\n')};\n}`;
+            }
           } else {
             out += 'object';
           }
@@ -665,11 +677,12 @@ export default class Converter {
     if (properties === undefined) return [];
     let convertedProperties = [];
     // For each property, just add it as a const, appending | undefined if it's optional
-    for (let prop of Object.keys(properties)) {
+    for (let [propName, prop] of Object.entries(properties)) {
+      prop.id = propName;
       convertedProperties.push(
-        `${commentFromSchema(properties[prop])}const ${prop}: ${this.convertType(
-          properties[prop]
-        )}${properties[prop].optional ? ' | undefined' : ''};`
+        `${commentFromSchema(prop)}const ${propName}: ${this.convertType(prop)}${
+          prop.optional ? ' | undefined' : ''
+        };`
       );
     }
     return convertedProperties;
@@ -744,7 +757,7 @@ export default class Converter {
       if (callback) {
         // Remove callback from parameters as we're gonna handle it as a promise return
         func.parameters = func.parameters!.filter((x) => x !== callback);
-        let parameters = this.convertParameters(callback.parameters, false, func.name);
+        let parameters = this.convertParameters(callback.parameters, false, pascalCase(`${func.name}_return`));
         if (parameters.length > 1) {
           // Since these files are originally chrome, some things are a bit weird
           // Callbacks (which is what chrome uses) have no issues with returning multiple values
