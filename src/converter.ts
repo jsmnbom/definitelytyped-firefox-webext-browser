@@ -3,6 +3,7 @@ import * as path from 'path';
 
 import stripJsonComments from 'strip-json-comments';
 import * as _ from 'lodash';
+import {pascalCase} from 'change-case';
 
 import { descToMarkdown, toDocComment } from './desc-to-doc';
 
@@ -379,15 +380,6 @@ export class Converter {
     return ref;
   }
 
-  // noinspection JSMethodCanBeStatic
-  convertName(name: string) {
-    // Convert from snake_case to PascalCase
-    return name
-      .split('_')
-      .map((x) => x.charAt(0).toUpperCase() + x.slice(1))
-      .join('');
-  }
-
   convertType(type: TypeSchema, root = false): string {
     // Check if we've overridden it, likely for a type that can't be represented in json schema
     if (type.converterTypeOverride) {
@@ -465,7 +457,7 @@ export class Converter {
         out += ';';
       } else {
         if (type.id) {
-          const typeName = `_${this.convertName(type.id)}`;
+          const typeName = `_${pascalCase(type.id)}`;
           // If we're not in the root, add the enum as an additional type instead, adding an _ in front of
           // the name We convert the actual enum based on rules above by passing through the whole type code
           // again, but this time as root
@@ -651,7 +643,7 @@ export class Converter {
         // As per https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23002 don't use actual
         // typescript enums
         convertedTypes.push(
-          `${comment}type ${this.convertName(type.id as string)} = ${convertedType}`
+          `${comment}type ${pascalCase(type.id!)} = ${convertedType}`
         );
       } else {
         // It's just a type of some kind
@@ -683,9 +675,9 @@ export class Converter {
       let out = '';
       // If includeName then include the name (add ? if optional)
       if (includeName)
-        out += `${parameter.name ? parameter.name : parameter}${parameter.optional ? '?' : ''}: `;
+        out += `${parameter.name || ''}${parameter.optional ? '?' : ''}: `;
       // Convert the paremeter type passing parent id as id
-      parameter.id = name;
+      parameter.id = pascalCase(`${name}_${parameter.name || ''}`)
       out += this.convertType(parameter);
       convertedParameters.push(out);
     }
@@ -851,7 +843,7 @@ export class Converter {
   ) {
     if (extra) {
       // It has extra parameters, so output custom event handler
-      let listenerName = '_' + this.convertName(`${this.namespace}_${name}_Event`);
+      let listenerName = '_' + pascalCase(`${this.namespace}_${name}_Event`);
       this.additionalTypes.push(`interface ${listenerName}<TCallback = (${parameters.join(
         ', '
       )}) => ${returnType}> {
@@ -882,11 +874,11 @@ export class Converter {
     let extra;
     if (event.extraParameters) {
       // If we do, get them
-      extra = this.convertParameters(event.extraParameters, true);
+      extra = this.convertParameters(event.extraParameters, true, event.name);
     }
 
     // Get parameters
-    let parameters = this.convertParameters(event.parameters, true);
+    let parameters = this.convertParameters(event.parameters, true, event.name);
     // Typescript can't handle when e.g. parameter 1 is optional, but parameter 2 isn't
     // Therefore output multiple event choices where we one by one, strip the optional status
     // So we get an event that's '(one, two) | (two)' instead of '(one?, two)'

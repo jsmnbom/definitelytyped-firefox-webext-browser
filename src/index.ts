@@ -228,7 +228,7 @@ for (let [namespace, funcs] of <Array<[string, Array<[string, boolean | string]>
   [
     'captivePortal',
     [
-      ['getState', '_UndefinedState'],
+      ['getState', '_OnStateChangedDetailsState'],
       ['getLastChecked', 'number'],
     ],
   ],
