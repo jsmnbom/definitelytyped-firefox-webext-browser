@@ -3,7 +3,6 @@ import * as path from 'path';
 
 import stripJsonComments from 'strip-json-comments';
 import * as _ from 'lodash';
-import {pascalCase} from 'change-case';
 
 import { descToMarkdown, toDocComment } from './desc-to-doc';
 
@@ -67,6 +66,10 @@ const CTX_CMT_NOT_ALLOWED_IN = ['content', 'devtools'];
 
 // Comment "Allowed in" for these contexts
 const CTX_CMT_ALLOWED_IN = ['proxy'];
+
+function pascalCase(s: string): string {
+    return s.split('_').map(x => x.charAt(0).toUpperCase() + x.slice(1)).join('');
+}
 
 // Formats an allowedContexts array to a readable string
 function formatContexts(contexts: string[] | undefined, outputAlways = false) {
@@ -427,50 +430,57 @@ export default class Converter {
       // If it's an enum
       // Make sure it has a proper id
       if (type.name && !type.id) type.id = type.name;
-      // We can only output enums in the namespace root (a schema enum, instead of e.g. a property having an enum
-      // as type)
-      if (root) {
-        // So if we are in the root
-        // Add each enum value, and format its comment
-        const normalized = type.enum.map((x) => {
-          if (typeof x !== 'string') {
-            return {
-              comment: commentFromSchema(x),
-              value: x.name,
-            };
-          }
-          return {
-            comment: '',
-            value: x,
-          };
-        });
-        // Should it be output across multiple lines?
-        // Yes if either more than 2 elements or we got multiple lines already
-        const multiline = normalized.length > 2 || normalized.some((x) => x.comment.includes('\n'));
-        if (multiline) out += '\n';
-        // For each entry, join using | adding newlines as needed
-        for (const [i, x] of normalized.entries()) {
-          out += x.comment;
-          out += i > 0 ? `|` : '';
-          out += `"${x.value}"${multiline && i !== normalized.length - 1 ? '\n' : ''}`;
-        }
-        out += ';';
+
+      // If there's only one option, then it's not a proper enum, so just output directly
+      if (type.enum.length === 1) {
+        out += `"${type.enum[0]}"`;
       } else {
-        if (type.id) {
-          const typeName = `_${pascalCase(type.id)}`;
-          // If we're not in the root, add the enum as an additional type instead, adding an _ in front of
-          // the name We convert the actual enum based on rules above by passing through the whole type code
-          // again, but this time as root
-          // As per https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23002 don't use actual
-          // typescript enums
-          this.additionalTypes.push(
-            `${commentFromSchema(type)}type ${typeName} = ${this.convertType(type, true)}`
-          );
-          // And then just reference it by name in output
-          out += typeName;
+        // We can only output enums in the namespace root (a schema enum, instead of e.g. a property having an enum
+        // as type)
+        if (root) {
+          // So if we are in the root
+          // Add each enum value, and format its comment
+          const normalized = type.enum.map((x) => {
+            if (typeof x !== 'string') {
+              return {
+                comment: commentFromSchema(x),
+                value: x.name,
+              };
+            }
+            return {
+              comment: '',
+              value: x,
+            };
+          });
+          // Should it be output across multiple lines?
+          // Yes if either more than 2 elements or we got multiple lines already
+          const multiline =
+            normalized.length > 2 || normalized.some((x) => x.comment.includes('\n'));
+          if (multiline) out += '\n';
+          // For each entry, join using | adding newlines as needed
+          for (const [i, x] of normalized.entries()) {
+            out += x.comment;
+            out += i > 0 ? `|` : '';
+            out += `"${x.value}"${multiline && i !== normalized.length - 1 ? '\n' : ''}`;
+          }
+          out += ';';
         } else {
-          // inline
-          out += type.enum.map((x) => `"${x}"`).join(' | ');
+          if (type.id) {
+            const typeName = `_${pascalCase(type.id)}`;
+            // If we're not in the root, add the enum as an additional type instead, adding an _ in front of
+            // the name We convert the actual enum based on rules above by passing through the whole type code
+            // again, but this time as root
+            // As per https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23002 don't use actual
+            // typescript enums
+            this.additionalTypes.push(
+              `${commentFromSchema(type)}type ${typeName} = ${this.convertType(type, true)}`
+            );
+            // And then just reference it by name in output
+            out += typeName;
+          } else {
+            // inline
+            out += type.enum.map((x) => `"${x}"`).join(' | ');
+          }
         }
       }
     } else if (type.type) {
@@ -642,9 +652,7 @@ export default class Converter {
       } else if (type.enum) {
         // As per https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23002 don't use actual
         // typescript enums
-        convertedTypes.push(
-          `${comment}type ${pascalCase(type.id!)} = ${convertedType}`
-        );
+        convertedTypes.push(`${comment}type ${pascalCase(type.id!)} = ${convertedType}`);
       } else {
         // It's just a type of some kind
         convertedTypes.push(`${comment}type ${type.id} = ${convertedType};`);
@@ -674,10 +682,9 @@ export default class Converter {
     for (let parameter of parameters) {
       let out = '';
       // If includeName then include the name (add ? if optional)
-      if (includeName)
-        out += `${parameter.name || ''}${parameter.optional ? '?' : ''}: `;
+      if (includeName) out += `${parameter.name || ''}${parameter.optional ? '?' : ''}: `;
       // Convert the paremeter type passing parent id as id
-      parameter.id = pascalCase(`${name}_${parameter.name || ''}`)
+      parameter.id = pascalCase(`${name}_${parameter.name || ''}`);
       out += this.convertType(parameter);
       convertedParameters.push(out);
     }
