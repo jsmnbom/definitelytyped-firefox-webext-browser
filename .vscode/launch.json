@@ -1,0 +1,39 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Run converter",
+            "program": "${workspaceFolder}/build/index.js",
+            "args": [
+                "--firefox_version",
+                "${input:shortVersion}",
+                "--out",
+                "${workspaceFolder}/firefox-webext-browser/index.d.ts",
+                "${workspaceFolder}/schemas/${input:fullVersion}/toolkit/",
+                "${workspaceFolder}/schemas/${input:fullVersion}/browser/",
+            ],
+        }
+    ],
+    "inputs": [
+        {
+            "id": "shortVersion",
+            "description": "Short firefox version",
+            "default": "10.0",
+            "type": "promptString",
+        },
+        {
+            "id": "fullVersion",
+            "type": "command",
+            "command": "shellCommand.execute",
+            "args": {
+                "command": "ls schemas | sort -r",
+                "cwd": "${workspaceFolder}"
+            }
+        }
+    ],
+}

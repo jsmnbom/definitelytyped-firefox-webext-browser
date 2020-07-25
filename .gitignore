@@ -60,12 +60,12 @@ typings/
 # Jetbrains IDEs
 .idea/
 
-# Visual Studio Code
-.vscode/
-
 # Built code from tsc
 build/
 
 # Suggested folders to put schema files in
 firefox/
 schemas/
+
+# Symlinked to DefinitelyTyped/types/firefox-webext-browser
+firefox-webext-browser
