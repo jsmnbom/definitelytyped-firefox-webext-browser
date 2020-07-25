@@ -669,8 +669,8 @@ export class Converter {
                     // Callbacks (which is what chrome uses) have no issues with returning multiple values
                     // but firefox uses promises, which AFAIK can't handle that
                     // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in
-                    // question yet But since it's in the schemas, it's still a problem for us TODO: Follow firefox
-                    // developments in this area
+                    // question yet But since it's in the schemas, it's still a problem for us
+                    // TODO: Follow firefox developments in this area
                     console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
                     // Just assume it's gonna be some kind of object that's returned from the promise
                     // This seems like the most likely way the firefox team is going to make the promise return
@@ -682,8 +682,7 @@ export class Converter {
                 let promiseReturn = parameters[0] || 'void';
 
                 // https://github.com/jsmnbom/definitelytyped-firefox-webext-browser/issues/21
-                //if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += ' |
-                // undefined';
+                //if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += '|undefined';
 
                 returnType = `Promise<${promiseReturn}>`;
                 // Because of namespace extends(?), a few functions can pass through here twice,
@@ -704,6 +703,7 @@ export class Converter {
         // Check if "parameters[index]" is optional with at least one required parameter following it
         let isLeadingOptional = (parameters: TypeSchema[], index: number) => {
             let firstRequiredIndex = parameters.findIndex(x => !x.optional);
+            if (firstRequiredIndex === -1) return parameters.length > 1;
             return firstRequiredIndex > index;
         };
 
@@ -713,8 +713,7 @@ export class Converter {
         let rest = [];
         for (let [i, param] of (func.parameters || []).entries()) {
             if (isLeadingOptional(func.parameters!, i)) {
-                // It won't be optional in the overload signature, so create a copy of it marked as non-optional
-                leadingOptionals.push({...param, optional: false});
+                leadingOptionals.push(param);
             } else {
                 rest.push(param);
             }
@@ -729,9 +728,15 @@ export class Converter {
         for (let i = 0; i < leadingOptionals.length; i++) {
             let funcWithParams = {
                 ...func,
-                parameters: leadingOptionals.slice(i).concat(rest),
+                // Get the last i items, and make sure that the last item is optional, then concat with rest of params
+                parameters: leadingOptionals.slice(i).map((param, paramI) => {
+                    return {
+                        ...param,
+                        optional: paramI > i
+                    } as TypeSchema
+                }).concat(rest),
             };
-            out += "\n" + this.convertSingleFunction(func.name!, returnType, arrow, classy, funcWithParams) + (classy ? ';\n' : '');
+            out += "\n" + this.convertSingleFunction(func.name!, returnType, arrow, classy, funcWithParams) + (classy && i !== leadingOptionals.length-1 ? ';\n' : '');
         }
 
         return out;
