@@ -160,7 +160,7 @@ function* deepIteratePlainObjects(item: object): Iterable<object> {
   }
 }
 
-export class Converter {
+export default class Converter {
   out: string;
   readonly namespace_aliases: Indexable<string>;
   readonly schemaData: [string, NamespaceSchema[]][];
