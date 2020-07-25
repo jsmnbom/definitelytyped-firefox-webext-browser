@@ -764,7 +764,10 @@ export class Converter {
         let promiseReturn = parameters[0] || 'void';
 
         // https://github.com/jsmnbom/definitelytyped-firefox-webext-browser/issues/21
-        //if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += '|undefined';
+        //if (callback.optional && !ALREADY_OPTIONAL_RETURNS.includes(promiseReturn)) promiseReturn += '|undefined';7
+        // https://github.com/jsmnbom/definitelytyped-firefox-webext-browser/issues/35
+        if (callback.converterPromiseOptional) promiseReturn += '|undefined';
+        if (callback.converterPromiseOptionalNull) promiseReturn += '|null';
 
         returnType = `Promise<${promiseReturn}>`;
         // Because of namespace extends(?), a few functions can pass through here twice,

@@ -46,6 +46,8 @@ interface TypeSchema {
   async?: true | 'callback';
   converterTypeOverride?: string;
   converterAdditionalType?: string;
+  converterPromiseOptional?: boolean;
+  converterPromiseOptionalNull?: boolean
 }
 interface Indexable<V> {
   [k: string]: V;

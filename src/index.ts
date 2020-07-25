@@ -322,6 +322,20 @@ converter.edit('permissions', 'functions', 'remove', (remove) => {
   ];
   return remove;
 });
+// https://github.com/jsmnbom/definitelytyped-firefox-webext-browser/issues/35
+converter.edit('alarms', 'functions', 'get', (get) => {
+  get.parameters[1].converterPromiseOptional = true;
+  return get;
+});
+
+converter.edit('cookies', 'functions', 'get', (get) => {
+  get.parameters[1].converterPromiseOptionalNull = true;
+  return get;
+});
+converter.edit('cookies', 'functions', 'remove', (remove) => {
+  remove.parameters[1].converterPromiseOptionalNull = true;
+  return remove;
+});
 
 converter.convert();
 converter.write(argv['out']);
