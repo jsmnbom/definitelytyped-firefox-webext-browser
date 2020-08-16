@@ -553,7 +553,8 @@ export default class Converter {
             arrayType.includes('\n') ||
             arrayType.includes(';') ||
             arrayType.includes(',') ||
-            arrayType.includes('"')
+            arrayType.includes('"') ||
+            arrayType.includes('|')
           ) {
             // If it's not simple, use the Array<type> syntax
             out += `Array<${arrayType}>`;
