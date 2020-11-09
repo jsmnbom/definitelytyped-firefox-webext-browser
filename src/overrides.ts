@@ -4,6 +4,12 @@ export default function override(converter: Converter) {
   // Remove test namespace since it's not exposed in api
   converter.removeNamespace('test');
 
+  // Fix extensionTypes.Date
+  converter.edit('extensionTypes', 'types', 'Date', (Date) => {
+    Date.choices![2].isInstanceOf = 'globalThis.Date'
+    return Date;
+  })
+
   // browser.runtime.getManifest should return WebExtensionManifest
   converter.edit('runtime', 'functions', 'getManifest', (x) => {
     x.returns = { $ref: 'manifest.WebExtensionManifest' };
@@ -12,8 +18,8 @@ export default function override(converter: Converter) {
 
   // Fix dupe _NativeManifestType
   converter.edit('_manifest', 'types', 'NativeManifest', (x) => {
-    x.choices[0].properties.type.converterTypeOverride = '"pkcs11"| "stdio"';
-    x.choices[1].properties.type.converterTypeOverride = '"storage"';
+    x.choices![0].properties!.type.converterTypeOverride = '"pkcs11"| "stdio"';
+    x.choices![1].properties!.type.converterTypeOverride = '"storage"';
     return x;
   });
 
@@ -75,7 +81,7 @@ export default function override(converter: Converter) {
 
   // Additional fix for webrequest.onAuthRequired
   converter.edit('webRequest', 'events', 'onAuthRequired', (x) => {
-    x.parameters = x.parameters.filter((y: TypeSchema) => y.name !== 'callback');
+    x.parameters = x.parameters!.filter((y: TypeSchema) => y.name !== 'callback');
     return x;
   });
 
@@ -210,11 +216,11 @@ export default function override(converter: Converter) {
   }
 
   // Prevent some of Event from being promisified
-  converter.edit('events', 'types', 'Event', (x) => {
-    for (let f of x.functions.slice(0, 3)) {
+  converter.edit('events', 'types', 'Event', (Event) => {
+    for (let f of Event.functions!.slice(0, 3)) {
       f.async = false;
     }
-    return x;
+    return Event;
   });
 
   // Remove bookmarks.import and bookmarks.export as it breaks things
@@ -227,8 +233,8 @@ export default function override(converter: Converter) {
   // Fix runtime.Port.postMessage
   // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/23542
   converter.edit('runtime', 'types', 'Port', (Port) => {
-    Port.properties.postMessage.parameters = [{ type: 'object', name: 'message' }];
-    Port.properties.error = { converterTypeOverride: 'Error', optional: true };
+    Port.properties!.postMessage.parameters = [{ type: 'object', name: 'message' }];
+    Port.properties!.error = { converterTypeOverride: 'Error', optional: true };
     Port.events = [
       {
         name: 'onMessage',
@@ -241,8 +247,8 @@ export default function override(converter: Converter) {
         parameters: [{ $ref: 'Port', name: 'port' }],
       },
     ];
-    delete Port.properties.onDisconnect;
-    delete Port.properties.onMessage;
+    delete Port.properties!.onDisconnect;
+    delete Port.properties!.onMessage;
 
     return Port;
   });
@@ -269,7 +275,7 @@ export default function override(converter: Converter) {
 
   // Fix error return type in some proxy events
   converter.edit('proxy', 'events', 'onError', (onError) => {
-    onError.parameters[0].converterTypeOverride = 'Error';
+    onError.parameters![0].converterTypeOverride = 'Error';
     return onError;
   });
 
@@ -279,14 +285,14 @@ export default function override(converter: Converter) {
     'PersistentBackgroundProperty',
     (PersistentBackgroundProperty) => {
       PersistentBackgroundProperty.type = 'boolean';
-      PersistentBackgroundProperty.deprecated = PersistentBackgroundProperty.choices[1].deprecated;
+      PersistentBackgroundProperty.deprecated = PersistentBackgroundProperty.choices![1].deprecated;
       delete PersistentBackgroundProperty.choices;
       return PersistentBackgroundProperty;
     }
   );
 
   converter.edit('permissions', 'functions', 'remove', (remove) => {
-    remove.parameters[1].parameters = [
+    remove.parameters![1].parameters = [
       {
         type: 'boolean',
       },
@@ -296,17 +302,118 @@ export default function override(converter: Converter) {
 
   // https://github.com/jsmnbom/definitelytyped-firefox-webext-browser/issues/35
   converter.edit('alarms', 'functions', 'get', (get) => {
-    get.parameters[1].converterPromiseOptional = true;
+    get.parameters![1].converterPromiseOptional = true;
     return get;
   });
 
   // These methods can return null for some reason
   converter.edit('cookies', 'functions', 'get', (get) => {
-    get.parameters[1].converterPromiseOptionalNull = true;
+    get.parameters![1].converterPromiseOptionalNull = true;
     return get;
   });
   converter.edit('cookies', 'functions', 'remove', (remove) => {
-    remove.parameters[1].converterPromiseOptionalNull = true;
+    remove.parameters![1].converterPromiseOptionalNull = true;
     return remove;
   });
+
+  // Add runtime.PlatformNaclArch
+  converter.add('runtime', 'types', {
+    id: 'PlatformNaclArch',
+    type: 'string',
+    enum: ['arm', 'x86-32', 'x86-64'],
+  });
+
+  // Add webrequest.StreamFilter
+  converter.add('webRequest', 'types', {
+    id: 'StreamFilter',
+    type: 'object',
+    description: 'An object you can use to monitor and modify HTTP responses.',
+    functions: [
+      {
+        name: 'close',
+        type: 'function',
+        description: 'Closes the request.',
+        async: 'callback',
+      },
+      {
+        name: 'disconnect',
+        type: 'function',
+        description: 'Disconnects the filter from the request.',
+        async: 'callback',
+      },
+      {
+        name: 'suspend',
+        type: 'function',
+        description: 'Suspends processing of the request.',
+        async: 'callback',
+      },
+      {
+        name: 'resume',
+        type: 'function',
+        description: 'Resumes processing of the request.',
+        async: 'callback',
+      },
+      {
+        name: 'write',
+        type: 'function',
+        description: 'Writes some data to the output stream.',
+        async: 'callback',
+        parameters: [
+          {
+            name: 'data',
+            choices: [{ $ref: 'Uint8Array' }, { $ref: 'ArrayBuffer' }],
+          },
+        ],
+      },
+    ],
+    properties: {
+      status: {
+        type: 'string',
+        description: 'Describes the current status of the stream.',
+        enum: [
+          'uninitialized',
+          'transferringdata',
+          'finishedtransferringdata',
+          'suspended',
+          'closed',
+          'disconnected',
+          'failed',
+        ],
+      },
+      error: {
+        type: 'string',
+        description:
+          'A string that will contain an error message after the onerror event has fired.',
+      },
+      onerror: {
+        description: 'Event handler which is called when an error has occurred.',
+        converterTypeOverride: '((event: Event) => void) | null',
+      },
+      onstop: {
+        description:
+          'Event handler which is called when the stream has no more data to deliver and has closed.',
+        converterTypeOverride: '((event: Event) => void) | null',
+      },
+      onstart: {
+        description:
+          'Event handler which is called when the stream is about to start receiving data.',
+        converterTypeOverride: '((event: Event) => void) | null',
+      },
+      ondata: {
+        description: 'Event handler which is called when incoming data is available.',
+        converterTypeOverride: '((event: _StreamFilterOndataEvent) => void) | null',
+        converterAdditionalType: 'interface _StreamFilterOndataEvent extends Event { data: ArrayBuffer }'
+      },
+    },
+  });
+  // converter.add('webRequest', 'types', {
+  //   type: 'object',
+  //   id: '_StreamFilterOndataEvent',
+  //   $extend: 'Event',
+  //   properties: {
+  //     data: {
+  //       $ref: 'ArrayBuffer'
+  //     }
+  //   }
+  // });
 }

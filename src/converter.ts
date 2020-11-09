@@ -44,6 +44,18 @@ const RESERVED = [
   'void',
   'while',
   'with',
+  'Date'
+];
+
+//
+const GLOBAL_TYPES = [
+  'ImageData',
+  'ArrayBuffer',
+  'ImageData',
+  'Element',
+  'Uint8Array',
+  'globalThis.Date',
+  'Window'
 ];
 
 // Types that are considered "simple"
@@ -379,21 +391,31 @@ export default class Converter {
       // Okay, apparently typescript doesn't need that, as all the namepaces are combined by the compiler
       //out += 'browser.';
     } else if (!this.namespaces[this.namespace].types!.find((x) => x.id === ref)) {
-      console.log(`Warning: Cannot find reference "${ref}", assuming the browser knows better.`);
-      // Add a type X = any, so the type can be used, but won't be typechecked
-      this.additionalTypes.push(`type ${ref} = any;`);
+      if (!GLOBAL_TYPES.includes(ref)) {
+        console.error(
+          `Cannot find reference "${ref}", fix or add tot GLOBAL_TYPES if browser knows it.`
+        );
+        // Add a type X = any, so the type can be used, but won't be typechecked
+        this.additionalTypes.push(`type ${ref} = any;`);
+      }
     }
     return ref;
   }
 
   convertType(type: TypeSchema, root = false): string {
     // Check if we've overridden it, likely for a type that can't be represented in json schema
+
+    if (type.converterAdditionalType) {
+      this.additionalTypes.push(type.converterAdditionalType);
+      if (type.converterTypeOverride) {
+        return type.converterTypeOverride;
+      }
+      if (type.id) {
+        return type.id;
+      }
+    }
     if (type.converterTypeOverride) {
       return type.converterTypeOverride;
-    }
-    if (type.converterAdditionalType && type.id) {
-      this.additionalTypes.push(type.converterAdditionalType);
-      return type.id;
     }
     let out = '';
     // Check type of type
@@ -513,19 +535,17 @@ export default class Converter {
           }
         } else if (type.isInstanceOf) {
           // It's an instance of another type
-          if (type.additionalProperties && type.additionalProperties.type === 'any') {
-            // The schemas write set additionalProperties.type = 'any' when typechecking can be anything
-            // This usually means it's "window" included as part of DOM
-            if (type.isInstanceOf.toLowerCase() === 'window') {
+          // Check if it's a window
+          if (type.isInstanceOf == 'global') {
+            out += 'Window';
+          } else {
+            // Check if it's a browser type
+            if (GLOBAL_TYPES.includes(type.isInstanceOf)) {
               out += type.isInstanceOf;
             } else {
-              // Otherwise it's some object we don't know about, therefore just treat it as a random
-              // object
-              out += `object/*${type.isInstanceOf}*/`;
+              // Other wise try to convert as ref
+              out += this.convertRef(type.isInstanceOf);
             }
-          } else {
-            // If the schema does not do that, try converting as a reference
-            out += this.convertRef(type.isInstanceOf);
           }
         } else if (type.additionalProperties) {
           // If it has additional, but not normal properties, try converting those properties as a type,
@@ -757,7 +777,11 @@ export default class Converter {
       if (callback) {
         // Remove callback from parameters as we're gonna handle it as a promise return
         func.parameters = func.parameters!.filter((x) => x !== callback);
-        let parameters = this.convertParameters(callback.parameters, false, pascalCase(`${func.name}_return`));
+        let parameters = this.convertParameters(
+          callback.parameters,
+          false,
+          pascalCase(`${func.name}_return`)
+        );
         if (parameters.length > 1) {
           // Since these files are originally chrome, some things are a bit weird
           // Callbacks (which is what chrome uses) have no issues with returning multiple values
@@ -765,7 +789,7 @@ export default class Converter {
           // This doesn't seem to be a problem yet, as firefox hasn't actually implemented the methods in
           // question yet But since it's in the schemas, it's still a problem for us
           // TODO: Follow firefox developments in this area
-          console.log(`Warning: Promises cannot return more than one value: ${func.name}.`);
+          console.warn(`Promises cannot return more than one value: ${func.name}.`);
           // Just assume it's gonna be some kind of object that's returned from the promise
           // This seems like the most likely way the firefox team is going to make the promise return
           // multiple values
@@ -1034,14 +1058,13 @@ export default class Converter {
     delete this.namespaces[name];
   }
 
+  getIdOrName(type: TypeSchema) {
+    return type['id'] || type['name'] || type['$extend'] || type['$import'];
+  }
+
   getIndex(namespace: string, section: string, id_or_name: string): number {
     return (this.namespaces[namespace] as any)[section].findIndex((x: TypeSchema) => {
-      return (
-        x['id'] === id_or_name ||
-        x['name'] === id_or_name ||
-        x['$extend'] === id_or_name ||
-        x['$import'] === id_or_name
-      );
+      return this.getIdOrName(x) === id_or_name;
     });
   }
 
@@ -1052,7 +1075,12 @@ export default class Converter {
     );
   }
 
-  edit(namespace: string, section: string, id_or_name: string, edit: (x: any) => any) {
+  edit(
+    namespace: string,
+    section: string,
+    id_or_name: string,
+    edit: (type: TypeSchema) => TypeSchema
+  ) {
     console.log(`Editing ${namespace}.${section}.${id_or_name}`);
     const index = this.getIndex(namespace, section, id_or_name);
     const sectionObj = (this.namespaces[namespace] as any)[section];
@@ -1060,6 +1088,12 @@ export default class Converter {
       console.warn('WARNING: Is either undefined or null!');
     }
     sectionObj[index] = edit(sectionObj[index]);
+  }
+
+  add(namespace: string, section: string, value: TypeSchema) {
+    console.log(`Adding to ${namespace}.${section}.${this.getIdOrName(value)}`);
+    const sectionObj = (this.namespaces[namespace] as any)[section];
+    sectionObj.push(value);
   }
 
   edit_path(path: [string, string, string] | string[], edit: (x: any) => any) {

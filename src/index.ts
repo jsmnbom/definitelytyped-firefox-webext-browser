@@ -23,17 +23,13 @@ const HEADER = `// Type definitions for non-npm package WebExtension Development
 // Project: https://developer.mozilla.org/en-US/Add-ons/WebExtensions
 // Definitions by: Jasmin Bom <https://github.com/jsmnbom>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
-// TypeScript Version: 2.9
+// TypeScript Version: 3.4
 // Generated using script at github.com/jsmnbom/definitelytyped-firefox-webext-browser
 
 interface WebExtEvent<TCallback extends (...args: any[]) => any> {
     addListener(cb: TCallback): void;
     removeListener(cb: TCallback): void;
     hasListener(cb: TCallback): boolean;
-}
-
-interface Window {
-    browser: typeof browser;
 }
 
 `;

@@ -43,7 +43,7 @@ interface TypeSchema {
   maxItems?: number;
   items?: TypeSchema;
   value?: unknown;
-  async?: true | 'callback';
+  async?: boolean | 'callback';
   converterTypeOverride?: string;
   converterAdditionalType?: string;
   converterPromiseOptional?: boolean;
