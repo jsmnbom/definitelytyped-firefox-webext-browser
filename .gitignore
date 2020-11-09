@@ -69,3 +69,6 @@ schemas/
 
 # Symlinked to DefinitelyTyped/types/firefox-webext-browser
 firefox-webext-browser
+
+# Vscode stuff
+workspace.code-workspace
