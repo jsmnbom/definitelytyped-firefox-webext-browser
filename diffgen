@@ -3,5 +3,5 @@
 FROM=$1
 TO=$2
 
-diff -uNr schemas/$FROM schemas/$TO | gist -f "$FROM-to-$TO.diff" -p -d "Diff of {toolkit,
+diff -uNr schemas/$FROM schemas/$TO | gh gist create -f "$FROM-to-$TO.diff" -d "Diff of {toolkit,
 browser}/components/extensions/schemas/*.* in firefox source code, from version $FROM to $TO. Downloaded from https://hg.mozilla.org/mozilla-unified/summary."
