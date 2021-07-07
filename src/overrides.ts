@@ -6,9 +6,9 @@ export default function override(converter: Converter) {
 
   // Fix extensionTypes.Date
   converter.edit('extensionTypes', 'types', 'Date', (Date) => {
-    Date.choices![2].isInstanceOf = 'globalThis.Date'
+    Date.choices![2].isInstanceOf = 'globalThis.Date';
     return Date;
-  })
+  });
 
   // browser.runtime.getManifest should return WebExtensionManifest
   converter.edit('runtime', 'functions', 'getManifest', (x) => {
@@ -390,7 +390,8 @@ export default function override(converter: Converter) {
       ondata: {
         description: 'Event handler which is called when incoming data is available.',
         converterTypeOverride: '((event: _StreamFilterOndataEvent) => void) | null',
-        converterAdditionalType: 'interface _StreamFilterOndataEvent extends Event { data: ArrayBuffer }'
+        converterAdditionalType:
+          'interface _StreamFilterOndataEvent extends Event { data: ArrayBuffer }',
       },
     },
   });
@@ -404,4 +405,21 @@ export default function override(converter: Converter) {
   //     }
   //   }
   // });
+  converter.edit('identity', 'functions', 'getAuthToken', (getAuthToken) => {
+    getAuthToken.parameters![1].parameters = [
+      {
+        name: 'token',
+        type: 'string',
+        optional: true,
+      },
+      // {
+      //   name: 'grantedScopes',
+      //   type: 'array',
+      //   items: {
+      //     type: 'string',
+      //   },
+      // },
+    ];
+    return getAuthToken;
+  });
 }
