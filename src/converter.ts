@@ -44,7 +44,7 @@ const RESERVED = [
   'void',
   'while',
   'with',
-  'Date'
+  'Date',
 ];
 
 //
@@ -55,7 +55,7 @@ const GLOBAL_TYPES = [
   'Element',
   'Uint8Array',
   'globalThis.Date',
-  'Window'
+  'Window',
 ];
 
 // Types that are considered "simple"

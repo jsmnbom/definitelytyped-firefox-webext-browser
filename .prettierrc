@@ -1,6 +1,14 @@
 {
     "useTabs": false,
-    "tabWidth": 2,
+    "tabWidth": 4,
     "singleQuote": true,
-    "printWidth": 100
+    "printWidth": 100,
+    "overrides": [
+        {
+          "files": "src/**/*.*",
+          "options": {
+            "tabWidth": 2
+          }
+        }
+    ]
 }
