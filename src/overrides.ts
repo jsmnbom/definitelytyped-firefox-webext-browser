@@ -279,18 +279,6 @@ export default function override(converter: Converter) {
     return onError;
   });
 
-  converter.edit(
-    '_manifest',
-    'types',
-    'PersistentBackgroundProperty',
-    (PersistentBackgroundProperty) => {
-      PersistentBackgroundProperty.type = 'boolean';
-      PersistentBackgroundProperty.deprecated = PersistentBackgroundProperty.choices![1].deprecated;
-      delete PersistentBackgroundProperty.choices;
-      return PersistentBackgroundProperty;
-    }
-  );
-
   converter.edit('permissions', 'functions', 'remove', (remove) => {
     remove.parameters![1].parameters = [
       {

@@ -420,8 +420,17 @@ export default class Converter {
     let out = '';
     // Check type of type
     if (type.choices) {
-      // Okay so it's a choice between several types, we need to check
-      // if choices include enums, and if so combine them
+      // Okay so it's a choice between several types
+      // Check if it's actually just a boolean
+      if (
+        _.every(
+          type.choices.map((x) => x.type),
+          (x) => x == 'boolean'
+        )
+      ) {
+        return 'boolean';
+      }
+      // ¨Check if choices include enums, and if so combine them
       let choices: TypeSchema[] = [];
       let enums: Enum[] = [];
       for (let choice of type.choices) {
