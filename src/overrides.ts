@@ -107,7 +107,7 @@ export default function override(converter: Converter) {
       ],
     ],
     [
-      'browserAction',
+      'action',
       [
         ['openPopup', 'void'],
         ['openPopup', 'boolean'],

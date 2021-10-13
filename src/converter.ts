@@ -152,6 +152,12 @@ function commentFromSchema(schema: TypeSchema | NamespaceSchema | NameDesc) {
   } else if (type.unsupported) {
     doclines.push(`@deprecated Unsupported on Firefox at this time.`);
   }
+  if (type.min_manifest_version) {
+    doclines.push(`Needs at least manifest version ${type.min_manifest_version}.`);
+  }
+  if (type.max_manifest_version) {
+    doclines.push(`Not supported on manifest versions above ${type.max_manifest_version}.`);
+  }
   if (type.returns && type.returns.description) {
     doclines.push(`@returns ${descToMarkdown(type.returns.description)}`);
   }
@@ -225,6 +231,8 @@ export default class Converter {
             description: namespace.description,
             permissions: [],
             allowedContexts: [],
+            min_manifest_version: namespace.min_manifest_version,
+            max_manifest_version: namespace.max_manifest_version,
           };
           this.namespaces[namespace.namespace] = resNamespace;
         } else {
@@ -351,7 +359,9 @@ export default class Converter {
         convertedProperties.push(
           `${commentFromSchema(propertyType)}${name}${
             type.properties[name].optional ? '?' : ''
-          }: ${this.convertType(propertyType)}`
+          }: ${this.convertType(propertyType)}${
+            type.properties[name].optional ? ' | undefined' : ''
+          }`
         );
       }
     }
@@ -981,9 +991,15 @@ export default class Converter {
     let out = '';
 
     if (data.$import) {
-      let skipKeys = ['namespace', 'description', 'permissions'];
+      let skipKeys = [
+        'namespace',
+        'description',
+        'permissions',
+        'max_manifest_version',
+        'min_manifest_version',
+      ];
       _.mergeWith(data, this.namespaces[data.$import], (objValue, srcValue, key) => {
-        if (skipKeys.includes(key)) return objValue;
+        if (skipKeys.includes(key)) return objValue === undefined ? null : objValue;
         if (_.isArray(objValue)) {
           return _.uniqWith(objValue.concat(srcValue), (arrVal, othVal) => {
             return (
@@ -1031,6 +1047,14 @@ export default class Converter {
         doclines.push(`Manifest keys: ${manifestKeys.map((p) => `\`${p}\``).join(', ')}`);
       }
     }
+    // Manifest version
+    if (data.min_manifest_version) {
+      doclines.push(`Needs at least manifest version ${data.min_manifest_version}.`);
+    }
+    if (data.max_manifest_version) {
+      doclines.push(`Not supported on manifest versions above ${data.max_manifest_version}.`);
+    }
+
     // Allowed contexts
     let contexts = formatContexts(data.allowedContexts, true);
     if (contexts) {

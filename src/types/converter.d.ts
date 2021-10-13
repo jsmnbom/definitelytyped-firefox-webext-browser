@@ -8,6 +8,8 @@ interface NamespaceSchema {
   properties?: Indexable<TypeSchema>;
   events?: TypeSchema[];
   permissions?: string[];
+  min_manifest_version: number;
+  max_manifest_version: number;
 }
 
 interface NameDesc {
@@ -47,7 +49,9 @@ interface TypeSchema {
   converterTypeOverride?: string;
   converterAdditionalType?: string;
   converterPromiseOptional?: boolean;
-  converterPromiseOptionalNull?: boolean
+  converterPromiseOptionalNull?: boolean;
+  min_manifest_version?: number;
+  max_manifest_version?: number;
 }
 interface Indexable<V> {
   [k: string]: V;
