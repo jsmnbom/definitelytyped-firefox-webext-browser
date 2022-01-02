@@ -357,7 +357,7 @@ export default class Converter {
         propertyType.id = type.id + (name === 'properties' ? '' : '_' + name);
         // Output property type (adding a ? if optional)
         let val = this.convertType(propertyType);
-        if (val !== 'any' &&  type.properties[name].optional) val += ' | undefined';
+        if (val !== 'any' && type.properties[name].optional) val += ' | undefined';
         convertedProperties.push(
           `${commentFromSchema(propertyType)}${name}${
             type.properties[name].optional ? '?' : ''
@@ -1102,10 +1102,12 @@ export default class Converter {
   }
 
   remove(namespace: string, section: string, id_or_name: string) {
-    (this.namespaces[namespace] as any)[section].splice(
-      this.getIndex(namespace, section, id_or_name),
-      1
-    );
+    const index = this.getIndex(namespace, section, id_or_name);
+    if (index === -1) {
+      console.warn('Missing thing to remove', namespace, section, id_or_name);
+      return 
+    }
+    (this.namespaces[namespace] as any)[section].splice(index, 1);
   }
 
   edit(
@@ -1116,6 +1118,10 @@ export default class Converter {
   ) {
     console.log(`Editing ${namespace}.${section}.${id_or_name}`);
     const index = this.getIndex(namespace, section, id_or_name);
+    if (index === -1) {
+      console.warn('Missing thing to edit', namespace, section, id_or_name);
+      return 
+    }
     const sectionObj = (this.namespaces[namespace] as any)[section];
     if (sectionObj[index] === undefined || sectionObj[index] === null) {
       console.warn('WARNING: Is either undefined or null!');
