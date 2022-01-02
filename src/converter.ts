@@ -356,12 +356,12 @@ export default class Converter {
         // Make sure it has a proper id by adding parent id to id
         propertyType.id = type.id + (name === 'properties' ? '' : '_' + name);
         // Output property type (adding a ? if optional)
+        let val = this.convertType(propertyType);
+        if (val !== 'any' &&  type.properties[name].optional) val += ' | undefined';
         convertedProperties.push(
           `${commentFromSchema(propertyType)}${name}${
             type.properties[name].optional ? '?' : ''
-          }: ${this.convertType(propertyType)}${
-            type.properties[name].optional ? ' | undefined' : ''
-          }`
+          }: ${val}`
         );
       }
     }
