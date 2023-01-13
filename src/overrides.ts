@@ -225,8 +225,8 @@ export default function override(converter: Converter) {
 
   // Remove bookmarks.import and bookmarks.export as it breaks things
   // https://github.com/DefinitelyTyped/DefinitelyTyped/issues/24937
-  converter.remove('bookmarks', 'functions', 'import');
-  converter.remove('bookmarks', 'functions', 'export');
+  // converter.remove('bookmarks', 'functions', 'import');
+  // converter.remove('bookmarks', 'functions', 'export');
   converter.remove('bookmarks', 'events', 'onImportBegan');
   converter.remove('bookmarks', 'events', 'onImportEnded');
 
