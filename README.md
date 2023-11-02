@@ -37,7 +37,7 @@ $ node build/index.js --version 63.0 --out index.d.ts schemas/FIREFOX_63_0b6_REL
 
 And place the generated index.d.ts in [DefinitelyTyped/DefinitelyTyped/types/firefox-webext-browser](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/firefox-webext-browser), and write any tests you feel is necesary for the change (usually not necessary for simple version updates imo)
 
-Finally in DefinitelyTyped project, run `npm run prettier -- --write types/firefox-webext-browser/*.ts` to format generated file as well as the tests.
+Finally in DefinitelyTyped project, run `pnpm dprint fmt -- 'types/firefox-webext-browser/**/*.ts'` to format generated file as well as the tests.
 
 Note that for sending PRs to DefinitelyTyped you need to include why you changed. For simple updates (Firefox version 
 changes), this can be easily generated and uploaded to gist using the included script (requires the gist tool and 
